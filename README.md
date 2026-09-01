@@ -1,7 +1,12 @@
 # telepad
 
-A **rofi quick-switcher for Telegram** — hit a hotkey from anywhere, fuzzy-type a
-few letters, and your running [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop)
+You know the feeling: dozens — hundreds — of Telegram chats, groups, channels and
+DMs, and finding the right one means scrolling, half-remembering names, and searching
+inside the app. It's like having a thousand browser tabs open, except worse — they're
+spread across multiple accounts and buried under folders and archives.
+
+**telepad** is a **rofi quick-switcher for Telegram** — hit a hotkey from anywhere,
+fuzzy-type a few letters, and your running [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop)
 jumps straight to that chat, group, channel, contact, or **forum topic** —
 **across all your accounts**.
 
