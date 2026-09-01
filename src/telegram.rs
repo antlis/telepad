@@ -1,6 +1,7 @@
 //! grammers (MTProto) integration: connect, interactive login, dialog fetch.
 
 use anyhow::{anyhow, Context, Result};
+use std::collections::HashSet;
 use std::io::Write;
 use std::sync::Arc;
 
@@ -133,11 +134,62 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
         });
     }
 
+    // iter_dialogs only returns open conversations, so contacts you have no
+    // active chat with (e.g. blocked ones) are missing. Add them from the
+    // contact list, skipping any already present as a dialog.
+    let mut seen: HashSet<i64> = entries.iter().map(|e| e.id).collect();
+    for contact in fetch_contacts(client).await {
+        if seen.insert(contact.id) {
+            entries.push(contact);
+        }
+    }
+
     Ok(AccountCache {
         acc: account.acc,
         label: account.label.clone(),
         entries,
     })
+}
+
+/// Fetch the account's contacts as user entries (best-effort; empty on error).
+async fn fetch_contacts(client: &Client) -> Vec<Entry> {
+    let request = tl::functions::contacts::GetContacts { hash: 0 };
+    let users = match client.invoke(&request).await {
+        Ok(tl::enums::contacts::Contacts::Contacts(c)) => c.users,
+        Ok(tl::enums::contacts::Contacts::NotModified) => return Vec::new(),
+        Err(e) => {
+            eprintln!("warning: could not fetch contacts: {e:?}");
+            return Vec::new();
+        }
+    };
+    users
+        .into_iter()
+        .filter_map(|u| {
+            let tl::enums::User::User(user) = u else {
+                return None;
+            };
+            if user.deleted {
+                return None;
+            }
+            let name = [user.first_name.as_deref(), user.last_name.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let name = if name.is_empty() {
+                user.username.clone().unwrap_or_else(|| "(no name)".to_string())
+            } else {
+                name
+            };
+            Some(Entry {
+                name,
+                username: user.username,
+                id: user.id,
+                kind: "user".to_string(),
+                topics: Vec::new(),
+            })
+        })
+        .collect()
 }
 
 /// If `peer` is a forum supergroup, return an `InputPeer` for topic queries.
