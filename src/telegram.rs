@@ -144,11 +144,199 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
         }
     }
 
+    let archived = fetch_archived(client).await;
+
     Ok(AccountCache {
         acc: account.acc,
         label: account.label.clone(),
         entries,
+        archived,
     })
+}
+
+/// Fetch the archived folder (folder_id 1) as entries. `iter_dialogs` only
+/// covers the main folder and its request builder is private, so we call
+/// `messages.getDialogs` directly and reconstruct entries from the raw peers.
+async fn fetch_archived(client: &Client) -> Vec<Entry> {
+    use tl::enums::messages::Dialogs;
+    use tl::enums::{Dialog as TlDialog, InputPeer, Message as TlMessage};
+
+    let mut out: Vec<Entry> = Vec::new();
+    let mut seen: HashSet<i64> = HashSet::new();
+    let mut offset_date = 0;
+    let mut offset_id = 0;
+    let mut offset_peer = InputPeer::Empty;
+
+    // Page through the archive (folder 1). A single request is capped, so we
+    // keep going, advancing the offset by the last dialog, until a short page.
+    for _ in 0..50 {
+        let request = tl::functions::messages::GetDialogs {
+            exclude_pinned: false,
+            folder_id: Some(1),
+            offset_date,
+            offset_id,
+            offset_peer: offset_peer.clone(),
+            limit: 100,
+            hash: 0,
+        };
+        let (dialogs, messages, chats, users, maybe_more) = match client.invoke(&request).await {
+            Ok(Dialogs::Dialogs(d)) => (d.dialogs, d.messages, d.chats, d.users, false),
+            Ok(Dialogs::Slice(d)) => {
+                let more = d.dialogs.len() >= 100;
+                (d.dialogs, d.messages, d.chats, d.users, more)
+            }
+            _ => break,
+        };
+        if dialogs.is_empty() {
+            break;
+        }
+
+        let before = out.len();
+        for d in &dialogs {
+            let TlDialog::Dialog(d) = d else { continue };
+            if d.folder_id != Some(1) {
+                continue; // folder_id=1 request isn't always a hard filter
+            }
+            let bot_id = peer_bot_id(&d.peer);
+            if seen.insert(bot_id) {
+                if let Some(entry) = build_peer_entry(&d.peer, &users, &chats) {
+                    out.push(entry);
+                }
+            }
+        }
+
+        // Advance the offset from the last dialog on the page.
+        let last = dialogs.iter().rev().find_map(|d| match d {
+            TlDialog::Dialog(d) => Some(d),
+            _ => None,
+        });
+        let Some(last) = last else { break };
+        offset_id = last.top_message;
+        offset_date = messages
+            .iter()
+            .find_map(|m| match m {
+                TlMessage::Message(m) if m.id == last.top_message => Some(m.date),
+                TlMessage::Service(m) if m.id == last.top_message => Some(m.date),
+                _ => None,
+            })
+            .unwrap_or(offset_date);
+        offset_peer = input_peer_for(&last.peer, &users, &chats);
+
+        // Stop when the page was short or made no progress.
+        if !maybe_more || out.len() == before {
+            break;
+        }
+    }
+    out
+}
+
+fn peer_bot_id(peer: &tl::enums::Peer) -> i64 {
+    use tl::enums::Peer;
+    match peer {
+        Peer::User(p) => p.user_id,
+        Peer::Chat(p) => -p.chat_id,
+        Peer::Channel(p) => -(1_000_000_000_000 + p.channel_id),
+    }
+}
+
+/// Resolve a raw `Peer` to an `Entry` using the page's user/chat lists.
+fn build_peer_entry(
+    peer: &tl::enums::Peer,
+    users: &[tl::enums::User],
+    chats: &[tl::enums::Chat],
+) -> Option<Entry> {
+    use tl::enums::{Chat as TlChat, Peer, User as TlUser};
+    match peer {
+        Peer::User(p) => {
+            let u = users.iter().find_map(|u| match u {
+                TlUser::User(u) if u.id == p.user_id => Some(u),
+                _ => None,
+            })?;
+            if u.deleted {
+                return None;
+            }
+            let name = [u.first_name.as_deref(), u.last_name.as_deref()]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" ");
+            Some(Entry {
+                name: if name.is_empty() {
+                    u.username.clone().unwrap_or_else(|| "(no name)".into())
+                } else {
+                    name
+                },
+                username: u.username.clone(),
+                id: u.id,
+                kind: "user".into(),
+                topics: Vec::new(),
+            })
+        }
+        Peer::Chat(p) => {
+            let c = chats.iter().find_map(|c| match c {
+                TlChat::Chat(c) if c.id == p.chat_id => Some(c),
+                _ => None,
+            })?;
+            Some(Entry {
+                name: c.title.clone(),
+                username: None,
+                id: -c.id,
+                kind: "group".into(),
+                topics: Vec::new(),
+            })
+        }
+        Peer::Channel(p) => {
+            let c = chats.iter().find_map(|c| match c {
+                TlChat::Channel(c) if c.id == p.channel_id => Some(c),
+                _ => None,
+            })?;
+            Some(Entry {
+                name: c.title.clone(),
+                username: c.username.clone(),
+                id: -(1_000_000_000_000 + c.id),
+                kind: if c.broadcast { "channel" } else { "group" }.into(),
+                topics: Vec::new(),
+            })
+        }
+    }
+}
+
+/// Build an `InputPeer` (with access hash) for use as a paging offset.
+fn input_peer_for(
+    peer: &tl::enums::Peer,
+    users: &[tl::enums::User],
+    chats: &[tl::enums::Chat],
+) -> tl::enums::InputPeer {
+    use tl::enums::{Chat as TlChat, InputPeer, Peer, User as TlUser};
+    match peer {
+        Peer::User(p) => {
+            let access_hash = users
+                .iter()
+                .find_map(|u| match u {
+                    TlUser::User(u) if u.id == p.user_id => u.access_hash,
+                    _ => None,
+                })
+                .unwrap_or(0);
+            InputPeer::User(tl::types::InputPeerUser {
+                user_id: p.user_id,
+                access_hash,
+            })
+        }
+        Peer::Chat(p) => InputPeer::Chat(tl::types::InputPeerChat { chat_id: p.chat_id }),
+        Peer::Channel(p) => {
+            let access_hash = chats
+                .iter()
+                .find_map(|c| match c {
+                    TlChat::Channel(c) if c.id == p.channel_id => c.access_hash,
+                    _ => None,
+                })
+                .unwrap_or(0);
+            InputPeer::Channel(tl::types::InputPeerChannel {
+                channel_id: p.channel_id,
+                access_hash,
+            })
+        }
+    }
 }
 
 /// Fetch the account's contacts as user entries (best-effort; empty on error).

@@ -5,8 +5,12 @@ few letters, and your running [AyuGram Desktop](https://github.com/AyuGram/AyuGr
 jumps straight to that chat, group, channel, contact, or **forum topic** —
 **across all your accounts**.
 
-Think Discord's <kbd>Ctrl</kbd>+<kbd>K</kbd>, but as a global rofi menu that drives
-the desktop client you already have open.
+It's Discord's <kbd>Ctrl</kbd>+<kbd>K</kbd> quick-switcher, reimagined for the desktop
+Telegram client — and arguably better. Because it's a global **rofi + i3** binding,
+you trigger it from *any* window: your editor, terminal, browser, anything. No need to
+first focus the app. Where Discord makes you *focus Discord → Ctrl+K → type → jump*,
+telepad is just *hotkey → type → jump* from wherever you already are — fewer keystrokes,
+zero context switch.
 
 ```
 ┌─ data layer (grammers / MTProto) ─┐        ┌─ front-end (rofi) ─────────────────┐
@@ -25,6 +29,8 @@ the desktop client you already have open.
 
 - Fuzzy jump to any **chat, group, channel, or contact**, across all accounts
 - **Forum topics**: selecting a forum opens a second menu of its topics
+- **Archive**: a `🗄 Archived` entry per account — open the archive folder, or jump
+  straight to any archived chat
 - **Contacts included** — even blocked users or people you have no open chat with
 - **Cross-account**: switches to the target account before opening
 - Fullscreen rofi menu; simple `login` / `sync` / `menu` commands

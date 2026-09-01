@@ -35,6 +35,9 @@ pub struct AccountCache {
     /// Label shown in rofi.
     pub label: String,
     pub entries: Vec<Entry>,
+    /// Archived chats (folder 1), surfaced behind a separate menu item.
+    #[serde(default)]
+    pub archived: Vec<Entry>,
 }
 
 pub fn write(session: &str, cache: &AccountCache) -> Result<()> {

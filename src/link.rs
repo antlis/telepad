@@ -48,28 +48,47 @@ pub fn switch_account(key: &str, focus_cmd: &str, window_class: &str) -> Result<
     if key.is_empty() {
         return Ok(());
     }
-    // Focus AyuGram first. xdotool's own `windowactivate` is unreliable on i3
-    // (it blocks/warns on `_NET_WM_DESKTOP`), so focusing is delegated to a
-    // WM-native command; the key is then sent to whatever is now focused.
+    focus_and_keys(focus_cmd, window_class, &[key])
+}
+
+/// Open AyuGram's archive folder view: switch to the account (if a key is set),
+/// then inject Ctrl+9 (AyuGram's `ShowArchive` shortcut). There's no `tg://` for
+/// the archive folder, so this is the only way to focus it.
+pub fn open_archive(switch_key: &str, focus_cmd: &str, window_class: &str) -> Result<()> {
+    let mut keys: Vec<&str> = Vec::new();
+    if !switch_key.is_empty() {
+        keys.push(switch_key);
+    }
+    keys.push("ctrl+9");
+    focus_and_keys(focus_cmd, window_class, &keys)
+}
+
+/// Focus AyuGram (via `focus_cmd`), then inject each key in order with a small
+/// settle delay between them.
+///
+/// xdotool's own `windowactivate` is unreliable on i3 (it blocks/warns on
+/// `_NET_WM_DESKTOP`), so focusing is delegated to a WM-native command; keys are
+/// then sent to whatever is now focused.
+fn focus_and_keys(focus_cmd: &str, window_class: &str, keys: &[&str]) -> Result<()> {
     let focus = focus_cmd.replace("{class}", window_class);
     let status = Command::new("sh").arg("-c").arg(&focus).status()?;
     if !status.success() {
         return Err(anyhow!("focus command failed: {focus}"));
     }
-    // Let focus settle before typing.
     std::thread::sleep(std::time::Duration::from_millis(150));
 
-    let status = Command::new("xdotool")
-        .args(["key", "--clearmodifiers", key])
-        .status()?;
-    if !status.success() {
-        return Err(anyhow!(
-            "xdotool failed to send '{key}' (is xdotool installed?)"
-        ));
+    for key in keys {
+        let status = Command::new("xdotool")
+            .args(["key", "--clearmodifiers", key])
+            .status()?;
+        if !status.success() {
+            return Err(anyhow!(
+                "xdotool failed to send '{key}' (is xdotool installed?)"
+            ));
+        }
+        // Let the action (account switch / folder open) settle before the next.
+        std::thread::sleep(std::time::Duration::from_millis(250));
     }
-    // Let AyuGram finish switching before we open the chat, so the URL lands in
-    // the newly-active account.
-    std::thread::sleep(std::time::Duration::from_millis(250));
     Ok(())
 }
 

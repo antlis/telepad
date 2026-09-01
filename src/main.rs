@@ -57,8 +57,9 @@ async fn sync(cfg: &Config, target: &str) -> Result<()> {
         match telegram::fetch_dialogs(cfg, account).await {
             Ok(cache) => {
                 let count = cache.entries.len();
+                let archived = cache.archived.len();
                 cache::write(&account.session, &cache)?;
-                println!("synced '{}' ({count} chats)", account.label);
+                println!("synced '{}' ({count} chats, {archived} archived)", account.label);
             }
             Err(e) => eprintln!("skipping '{}': {e}", account.label),
         }
@@ -66,12 +67,37 @@ async fn sync(cfg: &Config, target: &str) -> Result<()> {
     Ok(())
 }
 
+/// A selectable row in the main menu.
+enum Target {
+    /// A chat/group/channel/contact (may itself expand into forum topics).
+    Chat {
+        switch_key: String,
+        entry: cache::Entry,
+    },
+    /// This account's archive folder — expands into a submenu of archived chats.
+    Archive {
+        switch_key: String,
+        label: String,
+        entries: Vec<cache::Entry>,
+    },
+}
+
+fn badge(entry: &cache::Entry) -> &'static str {
+    if !entry.topics.is_empty() {
+        return "forum ▸";
+    }
+    match entry.kind.as_str() {
+        "user" => "dm",
+        "channel" => "channel",
+        _ => "group",
+    }
+}
+
 /// Show the flat, cross-account quick-switcher and jump to the selection.
 async fn menu(cfg: &Config) -> Result<()> {
     // Flatten every account's cache into one list, tagged with the account.
     let mut lines = Vec::new();
-    // (switch_key, entry) for each row.
-    let mut targets: Vec<(String, cache::Entry)> = Vec::new();
+    let mut targets: Vec<Target> = Vec::new();
 
     for account in &cfg.accounts {
         if !cache::exists(&account.session) {
@@ -79,18 +105,23 @@ async fn menu(cfg: &Config) -> Result<()> {
         }
         let account_cache = cache::read(&account.session)?;
         for entry in account_cache.entries {
-            let badge = if !entry.topics.is_empty() {
-                "forum ▸"
-            } else {
-                match entry.kind.as_str() {
-                    "user" => "dm",
-                    "group" => "group",
-                    "channel" => "channel",
-                    other => other,
-                }
-            };
-            lines.push(format!("[{}] {}  ·  {}", account.label, entry.name, badge));
-            targets.push((account.switch_key.clone(), entry));
+            lines.push(format!("[{}] {}  ·  {}", account.label, entry.name, badge(&entry)));
+            targets.push(Target::Chat {
+                switch_key: account.switch_key.clone(),
+                entry,
+            });
+        }
+        if !account_cache.archived.is_empty() {
+            lines.push(format!(
+                "[{}] 🗄 Archived  ·  {} ▸",
+                account.label,
+                account_cache.archived.len()
+            ));
+            targets.push(Target::Archive {
+                switch_key: account.switch_key.clone(),
+                label: account.label.clone(),
+                entries: account_cache.archived,
+            });
         }
     }
 
@@ -101,10 +132,37 @@ async fn menu(cfg: &Config) -> Result<()> {
     let Some(index) = rofi::pick("Jump", &lines)? else {
         return Ok(()); // cancelled
     };
-    let (switch_key, entry) = &targets[index];
 
-    // For a forum, offer its topics in a second menu first (while rofi still
-    // has focus — before we steal focus to AyuGram for the account switch).
+    match &targets[index] {
+        Target::Chat { switch_key, entry } => open_entry(cfg, switch_key, entry),
+        Target::Archive {
+            switch_key,
+            label,
+            entries,
+        } => {
+            let mut lines = Vec::with_capacity(entries.len() + 1);
+            lines.push("🗄 Open Archive folder in AyuGram".to_string());
+            lines.extend(entries.iter().map(|e| format!("{}  ·  {}", e.name, badge(e))));
+            match rofi::pick(&format!("{label} ▸ archived"), &lines)? {
+                None => Ok(()), // cancelled
+                Some(0) => {
+                    // Open the archive folder view (switch account + Ctrl+9).
+                    if let Err(e) = link::open_archive(switch_key, &cfg.focus_cmd, &cfg.window_class)
+                    {
+                        eprintln!("warning: could not open archive folder: {e}");
+                    }
+                    Ok(())
+                }
+                Some(i) => open_entry(cfg, switch_key, &entries[i - 1]),
+            }
+        }
+    }
+}
+
+/// Switch to the entry's account, then open it — offering a topic submenu first
+/// if it's a forum. The topic menu is shown before the account-switch keypress,
+/// so rofi keeps focus during selection.
+fn open_entry(cfg: &Config, switch_key: &str, entry: &cache::Entry) -> Result<()> {
     let url = if entry.topics.is_empty() {
         link::build(entry)
     } else {
@@ -112,8 +170,8 @@ async fn menu(cfg: &Config) -> Result<()> {
         lines.push("↩  open group (no topic)".to_string());
         lines.extend(entry.topics.iter().map(|t| t.title.clone()));
         match rofi::pick(&format!("{} ▸ topic", entry.name), &lines)? {
-            None => return Ok(()),                 // cancelled
-            Some(0) => link::build(entry),         // whole group
+            None => return Ok(()),         // cancelled
+            Some(0) => link::build(entry), // whole group
             Some(i) => link::build_topic(entry, entry.topics[i - 1].id),
         }
     };
@@ -123,6 +181,5 @@ async fn menu(cfg: &Config) -> Result<()> {
     if let Err(e) = link::switch_account(switch_key, &cfg.focus_cmd, &cfg.window_class) {
         eprintln!("warning: account switch failed: {e}");
     }
-    link::open(&url)?;
-    Ok(())
+    link::open(&url)
 }
