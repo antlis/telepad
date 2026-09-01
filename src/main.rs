@@ -79,11 +79,15 @@ async fn menu(cfg: &Config) -> Result<()> {
         }
         let account_cache = cache::read(&account.session)?;
         for entry in account_cache.entries {
-            let badge = match entry.kind.as_str() {
-                "user" => "dm",
-                "group" => "group",
-                "channel" => "channel",
-                other => other,
+            let badge = if !entry.topics.is_empty() {
+                "forum ▸"
+            } else {
+                match entry.kind.as_str() {
+                    "user" => "dm",
+                    "group" => "group",
+                    "channel" => "channel",
+                    other => other,
+                }
             };
             lines.push(format!("[{}] {}  ·  {}", account.label, entry.name, badge));
             targets.push((account.switch_key.clone(), entry));
@@ -99,11 +103,26 @@ async fn menu(cfg: &Config) -> Result<()> {
     };
     let (switch_key, entry) = &targets[index];
 
-    // Switch to the target account first (safe key path), then open in it.
+    // For a forum, offer its topics in a second menu first (while rofi still
+    // has focus — before we steal focus to AyuGram for the account switch).
+    let url = if entry.topics.is_empty() {
+        link::build(entry)
+    } else {
+        let mut lines = Vec::with_capacity(entry.topics.len() + 1);
+        lines.push("↩  open group (no topic)".to_string());
+        lines.extend(entry.topics.iter().map(|t| t.title.clone()));
+        match rofi::pick(&format!("{} ▸ topic", entry.name), &lines)? {
+            None => return Ok(()),                 // cancelled
+            Some(0) => link::build(entry),         // whole group
+            Some(i) => link::build_topic(entry, entry.topics[i - 1].id),
+        }
+    };
+
+    // Switch to the target account (safe key path), then open in it.
     // A failed switch is non-fatal: we still try to open in the active account.
     if let Err(e) = link::switch_account(switch_key, &cfg.focus_cmd, &cfg.window_class) {
         eprintln!("warning: account switch failed: {e}");
     }
-    link::open(&link::build(entry))?;
+    link::open(&url)?;
     Ok(())
 }

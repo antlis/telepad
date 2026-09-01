@@ -16,6 +16,15 @@ pub struct Entry {
     pub id: i64,
     /// "user" | "group" | "channel".
     pub kind: String,
+    /// Forum topics, if this is a forum supergroup (empty otherwise).
+    #[serde(default)]
+    pub topics: Vec<Topic>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Topic {
+    pub id: i64,
+    pub title: String,
 }
 
 /// Full cache for a single account.

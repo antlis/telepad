@@ -7,9 +7,9 @@ use std::sync::Arc;
 use grammers_client::client::LoginToken;
 use grammers_client::peer::Peer;
 use grammers_client::session::storages::SqliteSession;
-use grammers_client::{Client, SenderPool, SignInError};
+use grammers_client::{tl, Client, SenderPool, SignInError};
 
-use crate::cache::{AccountCache, Entry};
+use crate::cache::{AccountCache, Entry, Topic};
 use crate::config::{self, Account, Config};
 
 /// A live client plus the background tasks driving its network I/O.
@@ -117,11 +117,19 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
             Peer::Channel(_) => "channel",
         };
         let name = peer.name().unwrap_or("(no name)").to_string();
+
+        // If this is a forum supergroup, pull its topic list too.
+        let topics = match forum_input_peer(peer) {
+            Some(input) => fetch_topics(client, input).await,
+            None => Vec::new(),
+        };
+
         entries.push(Entry {
             name,
             username: peer.username().map(str::to_string),
             id: peer.id().to_string().parse().unwrap_or(0),
             kind: kind.to_string(),
+            topics,
         });
     }
 
@@ -130,6 +138,49 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
         label: account.label.clone(),
         entries,
     })
+}
+
+/// If `peer` is a forum supergroup, return an `InputPeer` for topic queries.
+fn forum_input_peer(peer: &Peer) -> Option<tl::enums::InputPeer> {
+    let Peer::Group(group) = peer else {
+        return None;
+    };
+    let tl::enums::Chat::Channel(channel) = &group.raw else {
+        return None;
+    };
+    if !channel.forum {
+        return None;
+    }
+    Some(tl::enums::InputPeer::Channel(tl::types::InputPeerChannel {
+        channel_id: channel.id,
+        access_hash: channel.access_hash.unwrap_or(0),
+    }))
+}
+
+/// Fetch a forum's topics (best-effort; returns empty on error).
+async fn fetch_topics(client: &Client, peer: tl::enums::InputPeer) -> Vec<Topic> {
+    let request = tl::functions::messages::GetForumTopics {
+        peer,
+        q: None,
+        offset_date: 0,
+        offset_id: 0,
+        offset_topic: 0,
+        limit: 100,
+    };
+    match client.invoke(&request).await {
+        Ok(tl::enums::messages::ForumTopics::Topics(result)) => result
+            .topics
+            .into_iter()
+            .filter_map(|t| match t {
+                tl::enums::ForumTopic::Topic(topic) => Some(Topic {
+                    id: topic.id as i64,
+                    title: topic.title,
+                }),
+                tl::enums::ForumTopic::Deleted(_) => None,
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    }
 }
 
 fn prompt(label: &str) -> Result<String> {

@@ -25,6 +25,20 @@ pub fn build(entry: &Entry) -> String {
     }
 }
 
+/// Build the URL to open a specific forum `topic` within `entry`.
+///
+/// Public forum: `resolve?domain=X&topic=<id>`. Private forum: the `chat?id=`
+/// handler doesn't take a topic, so use `privatepost?channel=<raw>&topic=<id>`
+/// (`raw` is the bare channel id, i.e. the Bot-API id minus the -100… prefix).
+pub fn build_topic(entry: &Entry, topic_id: i64) -> String {
+    if let Some(username) = &entry.username {
+        format!("tg://resolve?domain={username}&topic={topic_id}")
+    } else {
+        let raw = -entry.id - 1_000_000_000_000;
+        format!("tg://privatepost?channel={raw}&topic={topic_id}")
+    }
+}
+
 /// Switch AyuGram to an account by focusing its window (via `focus_cmd`) and
 /// injecting the user-configured key (e.g. "alt+1"). This drives AyuGram's own
 /// account-switch shortcut — the safe path — instead of the deep-link `acc=`
