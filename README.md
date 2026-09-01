@@ -2,140 +2,159 @@
 
 A **rofi quick-switcher for Telegram** — hit a hotkey from anywhere, fuzzy-type a
 few letters, and your running [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop)
-jumps straight to that chat, group, or channel — **across all your accounts**.
+jumps straight to that chat, group, channel, contact, or **forum topic** —
+**across all your accounts**.
 
 Think Discord's <kbd>Ctrl</kbd>+<kbd>K</kbd>, but as a global rofi menu that drives
-the desktop app you already have open.
+the desktop client you already have open.
 
-> **Status: early / works-for-me.** Same-account jumping is solid. Cross-account
-> jumping works via injected key switches (see below). Forum *topics* aren't indexed
-> yet (see [Roadmap](#roadmap)).
+```
+┌─ data layer (grammers / MTProto) ─┐        ┌─ front-end (rofi) ─────────────────┐
+│ per account, once: log in         │        │ flat fuzzy list across accounts    │
+│ sync: dialogs + contacts + forum  │ ─cache→ │  ↳ forum? → topic submenu          │
+│       topics → JSON cache          │        │ → (xdotool: switch account)        │
+└────────────────────────────────────┘        │ → D-Bus Open → AyuGram navigates  │
+                                              └────────────────────────────────────┘
+```
+
+> **Status:** works day-to-day for the author on X11 + i3 + AyuGram. Rough edges
+> remain — see [Caveats](#caveats) and [Roadmap](#roadmap). Notably it has **only
+> been tested against AyuGram**, not vanilla Telegram Desktop yet.
+
+## Features
+
+- Fuzzy jump to any **chat, group, channel, or contact**, across all accounts
+- **Forum topics**: selecting a forum opens a second menu of its topics
+- **Contacts included** — even blocked users or people you have no open chat with
+- **Cross-account**: switches to the target account before opening
+- Fullscreen rofi menu; simple `login` / `sync` / `menu` commands
 
 ## How it works
 
-telepad has two halves that talk through a small on-disk cache:
-
-```
-┌─ data layer (grammers / MTProto) ─┐      ┌─ front-end (rofi) ─────────────────┐
-│ per account: log in once,          │      │ flat fuzzy list across accounts    │
-│ fetch dialog list → JSON cache     │─────▶│ → (xdotool switch account)         │
-└────────────────────────────────────┘ cache│ → D-Bus Open → AyuGram navigates  │
-                                            └────────────────────────────────────┘
-```
+Two halves that talk through a small on-disk cache:
 
 - **Reading your chats** uses [grammers](https://github.com/Lonami/grammers), a Rust
-  MTProto client. This is a *separate* login from AyuGram (it can't read AyuGram's
+  MTProto client. This is a **separate** login from AyuGram (it can't read AyuGram's
   encrypted `tdata`), so each account authenticates once and its session is cached.
-- **Navigating** hands a `tg://` link to the running AyuGram **in-process** over
-  D-Bus (`org.freedesktop.Application.Open` on `com.ayugram.desktop`). Public chats
-  resolve by `@username`; anything else (private groups/channels, username-less DMs)
-  opens by internal peer id via AyuGram's `tg://chat?id=` handler.
-- **Switching accounts** focuses the AyuGram window and injects the account-switch
-  key you bound inside AyuGram (e.g. `alt+1`), via `xdotool`.
+  `sync` pulls the dialog list, your contacts, and each forum's topics into a JSON
+  cache the menu reads.
+- **Navigating** hands a `tg://` link to the running client **in-process** over
+  D-Bus (`org.freedesktop.Application.Open` on `com.ayugram.desktop`). Public peers
+  resolve by `@username`; everything else (private groups/channels, username-less
+  DMs) opens by internal peer id via the `tg://chat?id=` handler; forum topics use
+  `resolve?domain=X&topic=` (public) or `privatepost?channel=<raw>&topic=` (private).
 
-### Why not `xdg-open` / `tg://…&acc=`?
+### Account switching (the ugly part)
 
-Two things that *seem* obvious don't work reliably:
+Switching account is done by **injecting the keypress you bound in the client**
+(e.g. `alt+2`) via `xdotool`, *not* by any `tg://` parameter. This is deliberate and
+worth understanding:
 
-- `xdg-open tg://…` spawns a **second** AyuGram process; its single-instance handoff
-  can race and kill the running window. The in-process D-Bus `Open` avoids spawning
-  anything.
-- The `tg://…&acc=N` deep-link account switch **crashes** AyuGram (a bug in the
-  account-switch-from-URL path; on Nix builds it dies silently with no crash dump).
-  So account switching is done with a real keypress instead — the same switch you'd
+- `tg://…&acc=N` **crashes** AyuGram. The deep-link account-switch path segfaults in
+  the builds tested (on Nix it dies silently — no crash dump, truncated log).
+- `xdg-open tg://…` spawns a **second** client process; its single-instance handoff
+  races and can kill the running window. So navigation uses the in-process D-Bus
+  `Open` instead, which never spawns anything.
+- That leaves no safe URL-based way to switch accounts, so telepad drives the
+  client's own account-switch shortcut with a real keypress — the same switch you'd
   do by hand, which is safe.
+
+Consequently, cross-account jumping needs: **X11**, **xdotool**, a window-focus
+command (default `i3-msg`), and the account-switch keys bound **inside** the client.
+Leave `switch_key` empty to stay same-account only (rock-solid, no xdotool needed).
 
 ## Requirements
 
 - **Rust** (to build)
 - **rofi** — the menu
-- **gdbus** (glibc / GLib) — delivers the URL to AyuGram
-- **xdotool** + an **X11** session — only needed for cross-account switching
+- **gdbus** (GLib) — delivers the URL to the running client
+- **xdotool** + an **X11** session — only for cross-account switching
+- a focuser — default `i3-msg` (override `focus_cmd` for other WMs)
 
 ## Install
 
 ```bash
 cargo build --release
-# copy target/release/telepad somewhere on your PATH
+# put target/release/telepad on your PATH
 ```
 
 ## Setup
 
 1. **API credentials** (free): https://my.telegram.org → API development tools → note
    your `api_id` and `api_hash`.
-
-2. **Bind account-switch keys in AyuGram** (needed for cross-account jumping):
-   AyuGram Settings → Advanced → keyboard shortcuts, bind command `account1` to a key
-   (e.g. `alt+1`), `account2` to `alt+2`, etc.
-
+2. **Bind account-switch keys in the client** (for cross-account): AyuGram/Telegram
+   Desktop → Settings → Advanced → keyboard shortcuts → bind `account1`, `account2`, …
+   to keys (e.g. `alt+1`, `alt+2`).
 3. **Configure telepad:**
    ```bash
    mkdir -p ~/.config/telepad
    cp config.example.toml ~/.config/telepad/config.toml
    $EDITOR ~/.config/telepad/config.toml
    ```
-   Set `api_id`/`api_hash` and one `[[accounts]]` block per account, giving each the
-   `switch_key` you bound in AyuGram.
-
+   Set `api_id`/`api_hash` and one `[[accounts]]` block per account, giving each its
+   `switch_key`.
 4. **Log in each account once:**
    ```bash
    telepad login personal
    ```
    > The login code arrives **inside your already-logged-in Telegram/AyuGram** (the
-   > Telegram service chat), *not* by SMS. If the account has 2FA you'll be prompted
-   > for the password too.
-
-5. **Build the chat cache:**
+   > Telegram service chat), *not* by SMS. 2FA password is prompted if set.
+5. **Build the cache:**
    ```bash
-   telepad sync            # all accounts
-   telepad sync work       # just one
+   telepad sync            # all accounts (dialogs + contacts + forum topics)
    ```
-
-6. **Bind the menu to a key** (e.g. i3):
-   ```
-   bindsym $mod+k exec --no-startup-id telepad
-   ```
+6. **Bind the menu to a key** (i3 example): `bindsym $mod+g exec --no-startup-id telepad`
 
 ## Usage
 
 ```bash
-telepad                 # show the quick-switcher (flat, all accounts)
+telepad                 # the quick-switcher (flat, all accounts)
 telepad menu            # same thing
-telepad sync [acct]     # refresh the chat cache (run periodically / via cron)
+telepad sync [acct]     # refresh the cache (run periodically / via cron)
 telepad login <acct>    # (re)authenticate an account
 ```
 
-Each row is tagged `[Account]`, so you can scope a search by typing the account name
-(`work signals`) or just jump by chat name (`signals`).
+Rows are tagged `[Account]`, so type an account name to scope (`work signals`) or
+just the chat name (`signals`). Forum rows show `forum ▸`.
 
 ## Config reference
 
 | Field | Meaning |
 |-------|---------|
 | `api_id` / `api_hash` | One app from my.telegram.org, shared by all accounts |
-| `window_class` | X11 class of AyuGram, focused before injecting the switch key |
-| `accounts[].acc` | 1-based slot in AyuGram's account list (display/ordering) |
+| `window_class` | X11 class of the client, focused before the switch key |
+| `focus_cmd` | Shell command to focus the client; `{class}` is substituted. Default `i3-msg [class="{class}"] focus` |
+| `accounts[].acc` | 1-based slot in the client's account list (display/ordering) |
 | `accounts[].label` | Name shown in rofi |
 | `accounts[].session` | Session file name under `~/.local/share/telepad/` |
 | `accounts[].phone` | International format; used only for `telepad login` |
 | `accounts[].switch_key` | xdotool key that switches to this account (e.g. `alt+1`); empty = never switch |
 
-## Limitations
+## Caveats
 
-- **Cross-account needs X11 + xdotool.** Switching is a synthetic keypress, so it
-  needs the key bound in AyuGram and depends on window focus/timing. On Wayland
-  you'd need a different injector (ydotool). Leave `switch_key` empty to stay
-  same-account only (rock-solid).
-- **Separate sessions.** grammers logs in independently of AyuGram, so each account
-  shows up as an extra device in your Telegram sessions list.
-- **Stale cache.** The list is a snapshot; re-run `telepad sync` (a cron job or a
-  `sync && menu` wrapper works well) to pick up new chats.
+- **Only tested with AyuGram**, not vanilla Telegram Desktop. The `tg://` handlers and
+  the `com.ayugram.desktop` D-Bus name are AyuGram-specific; Telegram Desktop uses
+  `org.telegram.desktop` and lacks AyuGram's `tg://chat?id=` handler. See the TODO.
+- **Cross-account needs X11 + xdotool** and depends on window focus/timing. On Wayland
+  you'd need a different injector (ydotool). Same-account is dependency-light.
+- **Separate sessions**: grammers logs in independently, so each account shows as an
+  extra device in your Telegram sessions list.
+- **Stale cache**: the list is a snapshot; re-run `telepad sync` to pick up new chats.
+- **"Recents" that aren't saved contacts** won't appear (only dialogs + saved
+  contacts are indexed).
 
-## Roadmap
+## Roadmap / TODO
 
-- **Forum topics** as first-class jump targets (AyuGram already accepts `&topic=<id>`;
-  needs a `channels.getForumTopics` fetch in the sync step).
-- Optional `sync`-on-open so the menu is always fresh.
+- [ ] **Test against vanilla Telegram Desktop** — make the D-Bus name, `tg://` scheme,
+      and id-based open configurable so it isn't AyuGram-only.
+- [ ] **Reduce dependencies / decouple from rofi + i3** — ideally a single
+      self-contained binary with its own minimal picker (or a pluggable menu backend)
+      and a WM-agnostic focus/switch mechanism, so it isn't tied to rofi, i3, and
+      xdotool. Goal: one package, few/no external CLI deps.
+- [ ] Investigate a non-crashing account switch (upstream fix to the `tg://…&acc=`
+      handler would remove the whole xdotool detour).
+- [ ] Include recent/top peers (`contacts.getTopPeers`) for non-contact recents.
+- [ ] Optional `sync`-on-open so the menu is always fresh.
 
 ## Prior art
 
