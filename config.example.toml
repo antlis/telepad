@@ -1,0 +1,34 @@
+# telepad configuration — copy to ~/.config/telepad/config.toml
+#
+# api_id / api_hash: register one app at https://my.telegram.org (free).
+# The same pair is reused for every account.
+api_id = 123456
+api_hash = "0123456789abcdef0123456789abcdef"
+
+# X11 window class of AyuGram, used to focus it before switching accounts.
+window_class = "AyuGramDesktop"
+
+# One [[accounts]] block per Telegram account.
+#
+# switch_key: the key you bound *inside AyuGram* to switch to this account
+#   (AyuGram Settings → Advanced → keyboard shortcuts, command "accountN").
+#   telepad focuses AyuGram and injects this key via xdotool before opening a
+#   chat, so the jump lands in the right account. Leave empty to never switch
+#   (open in whatever account is active).
+#
+#   NOTE: the tg:// `acc=` deep-link switch crashes AyuGram, so this key path is
+#   the only safe way to switch accounts from outside. Requires xdotool (X11).
+
+[[accounts]]
+acc = 1
+label = "Personal"
+session = "personal"
+phone = "+10000000000"   # only used for the initial `telepad login`
+switch_key = "alt+1"
+
+[[accounts]]
+acc = 2
+label = "Work"
+session = "work"
+phone = "+20000000000"
+switch_key = "alt+2"
