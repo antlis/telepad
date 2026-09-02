@@ -1,1 +1,6 @@
 /target
+
+# Never commit real credentials, sessions, or cached chat data
+config.toml
+*.session
+cache/
