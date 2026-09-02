@@ -7,6 +7,7 @@
 
 mod cache;
 mod config;
+mod frecency;
 mod link;
 mod rofi;
 mod telegram;
@@ -118,11 +119,20 @@ fn badge(entry: &cache::Entry) -> &'static str {
     }
 }
 
+/// One selectable row: its display line, what it jumps to, and the peer id used
+/// for frecency scoring (`None` for the folder/archive header rows).
+struct Row {
+    line: String,
+    target: Target,
+    id: Option<i64>,
+}
+
 /// Show the flat, cross-account quick-switcher and jump to the selection.
 async fn menu(cfg: &Config) -> Result<()> {
+    let mut frec = frecency::Store::load();
+
     // Flatten every account's cache into one list, tagged with the account.
-    let mut lines = Vec::new();
-    let mut targets: Vec<Target> = Vec::new();
+    let mut rows: Vec<Row> = Vec::new();
 
     for account in &cfg.accounts {
         if !cache::exists(&account.session) {
@@ -130,72 +140,96 @@ async fn menu(cfg: &Config) -> Result<()> {
         }
         let account_cache = cache::read(&account.session)?;
         for entry in account_cache.entries {
-            lines.push(format!(
-                "[{}] {}{}  ·  {}",
-                account.label,
-                entry.name,
-                handle(&entry),
-                badge(&entry)
-            ));
-            targets.push(Target::Chat {
-                switch_key: account.switch_key.clone(),
-                entry: entry.clone(),
+            rows.push(Row {
+                line: format!(
+                    "[{}] {}{}  ·  {}",
+                    account.label,
+                    entry.name,
+                    handle(&entry),
+                    badge(&entry)
+                ),
+                id: Some(entry.id),
+                target: Target::Chat {
+                    switch_key: account.switch_key.clone(),
+                    entry: entry.clone(),
+                },
             });
             // Also surface each forum topic as its own flat, searchable row.
             for topic in &entry.topics {
-                lines.push(format!(
-                    "[{}] {} ▸ {}  ·  topic",
-                    account.label, entry.name, topic.title
-                ));
-                targets.push(Target::Topic {
-                    switch_key: account.switch_key.clone(),
-                    entry: entry.clone(),
-                    topic_id: topic.id,
+                rows.push(Row {
+                    line: format!(
+                        "[{}] {} ▸ {}  ·  topic",
+                        account.label, entry.name, topic.title
+                    ),
+                    id: Some(entry.id),
+                    target: Target::Topic {
+                        switch_key: account.switch_key.clone(),
+                        entry: entry.clone(),
+                        topic_id: topic.id,
+                    },
                 });
             }
         }
         for folder in account_cache.folders {
-            lines.push(format!(
-                "[{}] 📁 {}  ·  {} ▸",
-                account.label,
-                folder.title,
-                folder.entries.len()
-            ));
-            targets.push(Target::Folder {
-                switch_key: account.switch_key.clone(),
-                title: folder.title,
-                entries: folder.entries,
+            rows.push(Row {
+                line: format!(
+                    "[{}] 📁 {}  ·  {} ▸",
+                    account.label,
+                    folder.title,
+                    folder.entries.len()
+                ),
+                id: None,
+                target: Target::Folder {
+                    switch_key: account.switch_key.clone(),
+                    title: folder.title,
+                    entries: folder.entries,
+                },
             });
         }
         if !account_cache.archived.is_empty() {
-            lines.push(format!(
-                "[{}] 🗄 Archived  ·  {} ▸",
-                account.label,
-                account_cache.archived.len()
-            ));
-            targets.push(Target::Archive {
-                switch_key: account.switch_key.clone(),
-                label: account.label.clone(),
-                entries: account_cache.archived,
+            rows.push(Row {
+                line: format!(
+                    "[{}] 🗄 Archived  ·  {} ▸",
+                    account.label,
+                    account_cache.archived.len()
+                ),
+                id: None,
+                target: Target::Archive {
+                    switch_key: account.switch_key.clone(),
+                    label: account.label.clone(),
+                    entries: account_cache.archived,
+                },
             });
         }
     }
 
-    if targets.is_empty() {
+    if rows.is_empty() {
         return Err(anyhow!("cache is empty — run `telepad sync` first"));
     }
 
+    // Float your most-used chats to the top. Stable, so never-jumped rows keep
+    // their original (per-account) order below the frecency-ranked ones.
+    rows.sort_by(|a, b| {
+        let sa = a.id.map(|i| frec.score(i)).unwrap_or(0.0);
+        let sb = b.id.map(|i| frec.score(i)).unwrap_or(0.0);
+        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let lines: Vec<String> = rows.iter().map(|r| r.line.clone()).collect();
     let Some(index) = rofi::pick("Jump", &lines)? else {
         return Ok(()); // cancelled
     };
 
-    match &targets[index] {
-        Target::Chat { switch_key, entry } => open_entry(cfg, switch_key, entry),
+    match &rows[index].target {
+        Target::Chat { switch_key, entry } => open_entry(cfg, switch_key, entry, &mut frec),
         Target::Topic {
             switch_key,
             entry,
             topic_id,
-        } => switch_and_open(cfg, switch_key, &link::build_topic(entry, *topic_id)),
+        } => {
+            frec.bump(entry.id);
+            switch_and_open(cfg, switch_key, &link::build_topic(entry, *topic_id))
+        }
         Target::Archive {
             switch_key,
             label,
@@ -218,7 +252,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                     }
                     Ok(())
                 }
-                Some(i) => open_entry(cfg, switch_key, &entries[i - 1]),
+                Some(i) => open_entry(cfg, switch_key, &entries[i - 1], &mut frec),
             }
         }
         Target::Folder {
@@ -232,7 +266,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                 .collect();
             match rofi::pick(&format!("📁 {title}"), &lines)? {
                 None => Ok(()), // cancelled
-                Some(i) => open_entry(cfg, switch_key, &entries[i]),
+                Some(i) => open_entry(cfg, switch_key, &entries[i], &mut frec),
             }
         }
     }
@@ -241,7 +275,12 @@ async fn menu(cfg: &Config) -> Result<()> {
 /// Switch to the entry's account, then open it — offering a topic submenu first
 /// if it's a forum. The topic menu is shown before the account-switch keypress,
 /// so rofi keeps focus during selection.
-fn open_entry(cfg: &Config, switch_key: &str, entry: &cache::Entry) -> Result<()> {
+fn open_entry(
+    cfg: &Config,
+    switch_key: &str,
+    entry: &cache::Entry,
+    frec: &mut frecency::Store,
+) -> Result<()> {
     let url = if entry.topics.is_empty() {
         link::build(entry)
     } else {
@@ -255,6 +294,7 @@ fn open_entry(cfg: &Config, switch_key: &str, entry: &cache::Entry) -> Result<()
         }
     };
 
+    frec.bump(entry.id);
     switch_and_open(cfg, switch_key, &url)
 }
 

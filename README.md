@@ -43,6 +43,8 @@ zero context switch.
   straight to any archived chat
 - **Contacts included** — even blocked users or people you have no open chat with
 - **Cross-account**: switches to the target account before opening
+- **Frecency ranking**: chats you jump to often (and recently) float to the top,
+  so the list stays sorted around how you actually use it
 - Fullscreen rofi menu; simple `login` / `sync` / `menu` commands
 
 ## How it works

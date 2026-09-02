@@ -91,3 +91,7 @@ pub fn session_path(session: &str) -> PathBuf {
 pub fn cache_path(session: &str) -> PathBuf {
     data_dir().join("cache").join(format!("{session}.json"))
 }
+
+pub fn frecency_path() -> PathBuf {
+    data_dir().join("frecency.json")
+}
