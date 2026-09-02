@@ -162,6 +162,13 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 - **Chat folders** list their explicitly-added chats. Folders defined purely by
   rules ("all groups", "unread", "non-contacts") with no named members won't
   populate, and selecting a folder chat doesn't switch the client's sidebar tab.
+- **"Creative" names are hard to find.** As always, if someone gives a channel or
+  nickname a name in a fancy font — those Unicode "𝔤𝔬𝔱𝔥𝔦𝔠" / "𝓼𝓬𝓻𝓲𝓹𝓽" /
+  fullwidth pseudo-fonts that aren't actually plain letters but styled math/Unicode
+  codepoints — it won't match a normal-text fuzzy search. Typing `signals` won't
+  find `𝓼𝓲𝓰𝓷𝓪𝓵𝓼`, because to the matcher they're entirely different characters.
+  telepad indexes the raw name as-is and does no Unicode font-normalization, so
+  you'd have to recognize and scroll to those visually.
 
 ## Roadmap / TODO
 
