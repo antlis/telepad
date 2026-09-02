@@ -10,7 +10,7 @@ use grammers_client::peer::Peer;
 use grammers_client::session::storages::SqliteSession;
 use grammers_client::{tl, Client, SenderPool, SignInError};
 
-use crate::cache::{AccountCache, Entry, Topic};
+use crate::cache::{AccountCache, Entry, Folder, Topic};
 use crate::config::{self, Account, Config};
 
 /// A live client plus the background tasks driving its network I/O.
@@ -146,12 +146,81 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
 
     let archived = fetch_archived(client).await;
 
+    // Folders reference chats by peer id; resolve them against everything we've
+    // already fetched (main dialogs, contacts, and archived chats).
+    let folders = fetch_folders(client, &entries, &archived).await;
+
     Ok(AccountCache {
         acc: account.acc,
         label: account.label.clone(),
         entries,
         archived,
+        folders,
     })
+}
+
+/// Fetch the account's chat folders (dialog filters) as submenus of chats.
+///
+/// A folder is resolved from its explicitly listed peers (`pinned_peers` +
+/// `include_peers`), matched against the chats we've already fetched. Folders
+/// defined purely by category flags (e.g. "all groups") with no explicit
+/// members won't populate — a known limitation. Best-effort; empty on error.
+async fn fetch_folders(client: &Client, main: &[Entry], archived: &[Entry]) -> Vec<Folder> {
+    use tl::enums::{DialogFilter, TextWithEntities};
+
+    let by_id: std::collections::HashMap<i64, &Entry> = main
+        .iter()
+        .chain(archived.iter())
+        .map(|e| (e.id, e))
+        .collect();
+
+    let filters = match client.invoke(&tl::functions::messages::GetDialogFilters {}).await {
+        Ok(tl::enums::messages::DialogFilters::Filters(f)) => f.filters,
+        Err(e) => {
+            eprintln!("warning: could not fetch folders: {e:?}");
+            return Vec::new();
+        }
+    };
+
+    let mut out = Vec::new();
+    for filter in filters {
+        let (title, pinned, include) = match filter {
+            DialogFilter::Filter(f) => (f.title, f.pinned_peers, f.include_peers),
+            DialogFilter::Chatlist(f) => (f.title, f.pinned_peers, f.include_peers),
+            DialogFilter::Default => continue, // the built-in "All chats"
+        };
+        let TextWithEntities::Entities(title) = title;
+
+        let mut entries = Vec::new();
+        let mut seen: HashSet<i64> = HashSet::new();
+        for ip in pinned.into_iter().chain(include) {
+            let Some(id) = input_peer_bot_id(&ip) else { continue };
+            if seen.insert(id) {
+                if let Some(entry) = by_id.get(&id) {
+                    entries.push((*entry).clone());
+                }
+            }
+        }
+
+        if !entries.is_empty() {
+            out.push(Folder {
+                title: title.text,
+                entries,
+            });
+        }
+    }
+    out
+}
+
+/// Bot-API id for an `InputPeer`, or `None` for kinds we can't map to a chat.
+fn input_peer_bot_id(peer: &tl::enums::InputPeer) -> Option<i64> {
+    use tl::enums::InputPeer;
+    match peer {
+        InputPeer::User(u) => Some(u.user_id),
+        InputPeer::Chat(c) => Some(-c.chat_id),
+        InputPeer::Channel(c) => Some(-(1_000_000_000_000 + c.channel_id)),
+        _ => None,
+    }
 }
 
 /// Fetch the archived folder (folder_id 1) as entries. `iter_dialogs` only

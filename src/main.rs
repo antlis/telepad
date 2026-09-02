@@ -58,8 +58,12 @@ async fn sync(cfg: &Config, target: &str) -> Result<()> {
             Ok(cache) => {
                 let count = cache.entries.len();
                 let archived = cache.archived.len();
+                let folders = cache.folders.len();
                 cache::write(&account.session, &cache)?;
-                println!("synced '{}' ({count} chats, {archived} archived)", account.label);
+                println!(
+                    "synced '{}' ({count} chats, {archived} archived, {folders} folders)",
+                    account.label
+                );
             }
             Err(e) => eprintln!("skipping '{}': {e}", account.label),
         }
@@ -84,6 +88,12 @@ enum Target {
     Archive {
         switch_key: String,
         label: String,
+        entries: Vec<cache::Entry>,
+    },
+    /// A chat folder (dialog filter) — expands into a submenu of its chats.
+    Folder {
+        switch_key: String,
+        title: String,
         entries: Vec<cache::Entry>,
     },
 }
@@ -128,6 +138,19 @@ async fn menu(cfg: &Config) -> Result<()> {
                     topic_id: topic.id,
                 });
             }
+        }
+        for folder in account_cache.folders {
+            lines.push(format!(
+                "[{}] 📁 {}  ·  {} ▸",
+                account.label,
+                folder.title,
+                folder.entries.len()
+            ));
+            targets.push(Target::Folder {
+                switch_key: account.switch_key.clone(),
+                title: folder.title,
+                entries: folder.entries,
+            });
         }
         if !account_cache.archived.is_empty() {
             lines.push(format!(
@@ -177,6 +200,20 @@ async fn menu(cfg: &Config) -> Result<()> {
                     Ok(())
                 }
                 Some(i) => open_entry(cfg, switch_key, &entries[i - 1]),
+            }
+        }
+        Target::Folder {
+            switch_key,
+            title,
+            entries,
+        } => {
+            let lines: Vec<String> = entries
+                .iter()
+                .map(|e| format!("{}  ·  {}", e.name, badge(e)))
+                .collect();
+            match rofi::pick(&format!("📁 {title}"), &lines)? {
+                None => Ok(()), // cancelled
+                Some(i) => open_entry(cfg, switch_key, &entries[i]),
             }
         }
     }

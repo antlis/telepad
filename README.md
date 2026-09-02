@@ -36,6 +36,8 @@ zero context switch.
 - **Forum topics**: every topic is a flat, searchable row (`Forum ▸ Topic  ·  topic`)
   so you can jump straight to one on the first keystroke — or select the forum itself
   to browse its topics in a submenu
+- **Chat folders**: a `📁 <Folder>` entry per account expands into a submenu of that
+  folder's chats
 - **Archive**: a `🗄 Archived` entry per account — open the archive folder, or jump
   straight to any archived chat
 - **Contacts included** — even blocked users or people you have no open chat with
@@ -49,8 +51,8 @@ Two halves that talk through a small on-disk cache:
 - **Reading your chats** uses [grammers](https://github.com/Lonami/grammers), a Rust
   MTProto client. This is a **separate** login from AyuGram (it can't read AyuGram's
   encrypted `tdata`), so each account authenticates once and its session is cached.
-  `sync` pulls the dialog list, your contacts, and each forum's topics into a JSON
-  cache the menu reads.
+  `sync` pulls the dialog list, your contacts, each forum's topics, and your chat
+  folders into a JSON cache the menu reads.
 - **Navigating** hands a `tg://` link to the running client **in-process** over
   D-Bus (`org.freedesktop.Application.Open` on `com.ayugram.desktop`). Public peers
   resolve by `@username`; everything else (private groups/channels, username-less
@@ -129,7 +131,8 @@ telepad login <acct>    # (re)authenticate an account
 
 Rows are tagged `[Account]`, so type an account name to scope (`work signals`) or
 just the chat name (`signals`). Forum rows show `forum ▸`, and each of their topics
-appears as its own `Forum ▸ Topic  ·  topic` row for direct jumping.
+appears as its own `Forum ▸ Topic  ·  topic` row for direct jumping. Chat folders
+show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 
 ## Config reference
 
@@ -156,6 +159,9 @@ appears as its own `Forum ▸ Topic  ·  topic` row for direct jumping.
 - **Stale cache**: the list is a snapshot; re-run `telepad sync` to pick up new chats.
 - **"Recents" that aren't saved contacts** won't appear (only dialogs + saved
   contacts are indexed).
+- **Chat folders** list their explicitly-added chats. Folders defined purely by
+  rules ("all groups", "unread", "non-contacts") with no named members won't
+  populate, and selecting a folder chat doesn't switch the client's sidebar tab.
 
 ## Roadmap / TODO
 

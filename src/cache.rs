@@ -27,6 +27,13 @@ pub struct Topic {
     pub title: String,
 }
 
+/// A Telegram chat folder (dialog filter), surfaced as a submenu of its chats.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Folder {
+    pub title: String,
+    pub entries: Vec<Entry>,
+}
+
 /// Full cache for a single account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountCache {
@@ -38,6 +45,9 @@ pub struct AccountCache {
     /// Archived chats (folder 1), surfaced behind a separate menu item.
     #[serde(default)]
     pub archived: Vec<Entry>,
+    /// User-defined chat folders (dialog filters), each a submenu of chats.
+    #[serde(default)]
+    pub folders: Vec<Folder>,
 }
 
 pub fn write(session: &str, cache: &AccountCache) -> Result<()> {
