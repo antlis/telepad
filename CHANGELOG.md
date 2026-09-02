@@ -5,6 +5,16 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-09-02
+
+### Fixed
+- **Jumping to username-less channels/supergroups.** These now open via
+  `tg://privatepost?channel=<raw>` instead of `tg://chat?id=<packed>`. AyuGram's
+  `chat?id=` fallback is broken for channels that aren't currently loaded (it
+  re-prepends `-100` to the already-packed PeerId), so jumps to less-active
+  private channels silently failed. `privatepost` routes through `showPeerByLink`,
+  which resolves the channel via the API whether or not it's loaded.
+
 ## [0.8.1] - 2026-09-02
 
 ### Added
@@ -102,6 +112,7 @@ your accounts.
   `com.ayugram.desktop`), avoiding the second-process race that kills the window.
 - `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
 
+[0.8.2]: https://github.com/antlis/telepad/releases/tag/v0.8.2
 [0.8.1]: https://github.com/antlis/telepad/releases/tag/v0.8.1
 [0.8.0]: https://github.com/antlis/telepad/releases/tag/v0.8.0
 [0.7.0]: https://github.com/antlis/telepad/releases/tag/v0.7.0

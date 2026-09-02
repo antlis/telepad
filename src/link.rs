@@ -14,12 +14,22 @@ const CHANNEL_SHIFT: u64 = 2 << 48;
 /// Build the `tg://` URL to open `entry` in the *currently active* account.
 ///
 /// No `acc=` param — account switching is done separately via [`switch_account`]
-/// because the deep-link `acc=` switch crashes this AyuGram build. A peer with a
-/// public username resolves by name; a username-less peer (private group/channel
-/// or a DM with no @username) opens by internal id via AyuGram's `chat?id=`.
+/// because the deep-link `acc=` switch crashes this AyuGram build.
+///
+/// - Public peer → `resolve?domain=`.
+/// - Username-less **channel/supergroup** → `privatepost?channel=<raw>`. This
+///   goes through AyuGram's `showPeerByLink`, which resolves the channel via the
+///   API even when it isn't loaded in the client. The `chat?id=` handler's
+///   fallback is broken for unloaded channels (it re-prepends `-100` to the
+///   already-packed PeerId), so jumps to less-active private channels fail.
+/// - Username-less user / legacy basic group → `chat?id=<packed PeerId>`.
 pub fn build(entry: &Entry) -> String {
     if let Some(username) = &entry.username {
         format!("tg://resolve?domain={username}")
+    } else if entry.id <= -1_000_000_000_000 {
+        // Channel/supergroup: bot id is -(1e12 + bare); recover the bare id.
+        let raw = -entry.id - 1_000_000_000_000;
+        format!("tg://privatepost?channel={raw}")
     } else {
         format!("tg://chat?id={}", tdesktop_peer_id(entry.id))
     }
