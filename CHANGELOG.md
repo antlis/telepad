@@ -5,6 +5,20 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-02
+
+### Added
+- **Avatars (opt-in).** `sync --avatars` downloads each main dialog's profile
+  photo into the avatar cache, and the menu shows it as the rofi row icon (rofi
+  now runs with `-show-icons`). Downloads are best-effort — peers without a photo
+  are skipped and a failed download warns without aborting the sync. Plain `sync`
+  is unchanged and pays no download cost.
+
+### Notes
+- Only main dialogs get avatars (that's where full peer objects are available);
+  contacts without a chat and archived chats don't. Icons appear in the main flat
+  list, not the folder/archive submenus. This is the one rofi-specific feature.
+
 ## [0.7.0] - 2026-09-02
 
 ### Added
@@ -80,6 +94,7 @@ your accounts.
   `com.ayugram.desktop`), avoiding the second-process race that kills the window.
 - `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
 
+[0.8.0]: https://github.com/antlis/telepad/releases/tag/v0.8.0
 [0.7.0]: https://github.com/antlis/telepad/releases/tag/v0.7.0
 [0.6.0]: https://github.com/antlis/telepad/releases/tag/v0.6.0
 [0.5.0]: https://github.com/antlis/telepad/releases/tag/v0.5.0

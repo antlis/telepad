@@ -95,8 +95,10 @@ pub async fn login(cfg: &Config, account: &Account) -> Result<()> {
     Ok(())
 }
 
-/// Fetch all dialogs for an account into a fresh cache.
-pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCache> {
+/// Fetch all dialogs for an account into a fresh cache. When `avatars` is set,
+/// also download each dialog's profile photo into the avatar cache (slower, and
+/// opt-in via `sync --avatars`).
+pub async fn fetch_dialogs(cfg: &Config, account: &Account, avatars: bool) -> Result<AccountCache> {
     let session = connect(cfg, &account.session).await?;
     let client = &session.client;
 
@@ -130,10 +132,15 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
             None => Vec::new(),
         };
 
+        let id = peer.id().to_string().parse().unwrap_or(0);
+        if avatars {
+            download_avatar(client, peer, id, &name).await;
+        }
+
         entries.push(Entry {
             name,
             username: peer.username().map(str::to_string),
-            id: peer.id().to_string().parse().unwrap_or(0),
+            id,
             kind: kind.to_string(),
             topics,
         });
@@ -164,6 +171,27 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
         archived,
         folders,
     })
+}
+
+/// Download a peer's small profile photo into the avatar cache (best-effort).
+/// Silently does nothing if the peer has no photo; warns but never fails on a
+/// download error, so one bad avatar can't abort the whole sync.
+async fn download_avatar(client: &Client, peer: &Peer, id: i64, name: &str) {
+    let photo = match peer.photo(false).await {
+        Ok(Some(photo)) => photo,
+        Ok(None) => return, // no profile photo
+        Err(e) => {
+            eprintln!("warning: could not resolve avatar for {name}: {e:?}");
+            return;
+        }
+    };
+    let path = config::avatar_path(id);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    if let Err(e) = client.download_media(&photo, &path).await {
+        eprintln!("warning: avatar download failed for {name}: {e:?}");
+    }
 }
 
 /// Fetch the account's chat folders (dialog filters) as submenus of chats.

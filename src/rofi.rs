@@ -15,6 +15,9 @@ pub fn pick(prompt: &str, lines: &[String]) -> Result<Option<usize>> {
             prompt,
             "-format",
             "i",
+            // Show per-row icons when a line carries `\0icon\x1f<path>` metadata
+            // (avatars from `sync --avatars`); harmless when absent.
+            "-show-icons",
             "-theme-str",
             "window { fullscreen: true; } mainbox { padding: 2%; }",
         ])

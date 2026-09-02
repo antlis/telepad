@@ -31,8 +31,14 @@ async fn main() -> Result<()> {
             telegram::login(&cfg, &account).await?;
         }
         Some("sync") => {
-            let target = args.get(1).map(String::as_str).unwrap_or("all");
-            sync(&cfg, target).await?;
+            let rest = &args[1..];
+            let avatars = rest.iter().any(|a| a == "--avatars");
+            let target = rest
+                .iter()
+                .find(|a| !a.starts_with("--"))
+                .map(String::as_str)
+                .unwrap_or("all");
+            sync(&cfg, target, avatars).await?;
         }
         Some("menu") | None => menu(&cfg).await?,
         Some(other) => {
@@ -45,7 +51,7 @@ async fn main() -> Result<()> {
 }
 
 /// Refresh the dialog cache for one account or all of them.
-async fn sync(cfg: &Config, target: &str) -> Result<()> {
+async fn sync(cfg: &Config, target: &str, avatars: bool) -> Result<()> {
     let accounts: Vec<_> = if target == "all" {
         cfg.accounts.iter().collect()
     } else {
@@ -55,7 +61,7 @@ async fn sync(cfg: &Config, target: &str) -> Result<()> {
     };
 
     for account in accounts {
-        match telegram::fetch_dialogs(cfg, account).await {
+        match telegram::fetch_dialogs(cfg, account, avatars).await {
             Ok(cache) => {
                 let count = cache.entries.len();
                 let archived = cache.archived.len();
@@ -125,6 +131,14 @@ struct Row {
     line: String,
     target: Target,
     id: Option<i64>,
+    /// Path to a cached avatar, shown as the rofi row icon if present.
+    icon: Option<String>,
+}
+
+/// Path to a peer's cached avatar, if one was downloaded by `sync --avatars`.
+fn avatar_for(id: i64) -> Option<String> {
+    let path = config::avatar_path(id);
+    path.exists().then(|| path.to_string_lossy().into_owned())
 }
 
 /// Show the flat, cross-account quick-switcher and jump to the selection.
@@ -152,6 +166,7 @@ async fn menu(cfg: &Config) -> Result<()> {
             rows.push(Row {
                 line: format!("[{}] ⭐ Saved Messages", account.label),
                 id: Some(entry.id),
+                icon: avatar_for(entry.id),
                 target: Target::Chat {
                     switch_key: account.switch_key.clone(),
                     entry,
@@ -172,6 +187,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                     badge(&entry)
                 ),
                 id: Some(entry.id),
+                icon: avatar_for(entry.id),
                 target: Target::Chat {
                     switch_key: account.switch_key.clone(),
                     entry: entry.clone(),
@@ -185,6 +201,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                         account.label, entry.name, topic.title
                     ),
                     id: Some(entry.id),
+                    icon: avatar_for(entry.id),
                     target: Target::Topic {
                         switch_key: account.switch_key.clone(),
                         entry: entry.clone(),
@@ -202,6 +219,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                     folder.entries.len()
                 ),
                 id: None,
+                icon: None,
                 target: Target::Folder {
                     switch_key: account.switch_key.clone(),
                     title: folder.title,
@@ -217,6 +235,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                     account_cache.archived.len()
                 ),
                 id: None,
+                icon: None,
                 target: Target::Archive {
                     switch_key: account.switch_key.clone(),
                     label: account.label.clone(),
@@ -238,7 +257,14 @@ async fn menu(cfg: &Config) -> Result<()> {
         sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let lines: Vec<String> = rows.iter().map(|r| r.line.clone()).collect();
+    // rofi row-option syntax: `text\0icon\x1f<path>` attaches a per-row icon.
+    let lines: Vec<String> = rows
+        .iter()
+        .map(|r| match &r.icon {
+            Some(path) => format!("{}\0icon\x1f{}", r.line, path),
+            None => r.line.clone(),
+        })
+        .collect();
     let Some(index) = rofi::pick("Jump", &lines)? else {
         return Ok(()); // cancelled
     };

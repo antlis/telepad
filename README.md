@@ -46,6 +46,8 @@ zero context switch.
 - **Frecency ranking**: chats you jump to often (and recently) float to the top,
   so the list stays sorted around how you actually use it
 - **Saved Messages**: a `⭐ Saved Messages` row per account, always a keystroke away
+- **Avatars** (opt-in): `sync --avatars` caches profile photos and rofi shows them
+  as row icons
 - Fullscreen rofi menu; simple `login` / `sync` / `menu` commands
 
 ## How it works
@@ -130,6 +132,7 @@ cargo build --release
 telepad                 # the quick-switcher (flat, all accounts)
 telepad menu            # same thing
 telepad sync [acct]     # refresh the cache (run periodically / via cron)
+telepad sync --avatars  # also download profile photos (slower; shown as row icons)
 telepad login <acct>    # (re)authenticate an account
 ```
 

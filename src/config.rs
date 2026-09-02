@@ -95,3 +95,8 @@ pub fn cache_path(session: &str) -> PathBuf {
 pub fn frecency_path() -> PathBuf {
     data_dir().join("frecency.json")
 }
+
+/// Cached profile photo for a peer (downloaded only by `sync --avatars`).
+pub fn avatar_path(id: i64) -> PathBuf {
+    data_dir().join("avatars").join(format!("{id}.jpg"))
+}
