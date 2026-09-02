@@ -141,9 +141,45 @@ fn avatar_for(id: i64) -> Option<String> {
     path.exists().then(|| path.to_string_lossy().into_owned())
 }
 
+/// A neutral silhouette used for rows that have no cached avatar, so the list
+/// stays visually even once some avatars are present.
+const PLACEHOLDER_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#4c566a"/>
+  <circle cx="50" cy="40" r="17" fill="#d8dee9"/>
+  <path d="M22 84a28 28 0 0 1 56 0z" fill="#d8dee9"/>
+</svg>
+"##;
+
+/// True if any avatars have been cached — i.e. `sync --avatars` has been run.
+/// When false, the menu shows no icons at all (clean text list).
+fn avatars_in_use() -> bool {
+    std::fs::read_dir(config::avatars_dir())
+        .map(|mut entries| entries.next().is_some())
+        .unwrap_or(false)
+}
+
+/// Ensure the placeholder icon exists on disk and return its path.
+fn ensure_placeholder() -> Option<String> {
+    let path = config::placeholder_avatar_path();
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        std::fs::write(&path, PLACEHOLDER_SVG).ok()?;
+    }
+    Some(path.to_string_lossy().into_owned())
+}
+
 /// Show the flat, cross-account quick-switcher and jump to the selection.
 async fn menu(cfg: &Config) -> Result<()> {
     let mut frec = frecency::Store::load();
+    // Fall back to a placeholder icon only once real avatars exist, so a menu
+    // that never synced avatars stays a clean, icon-less text list.
+    let placeholder = if avatars_in_use() {
+        ensure_placeholder()
+    } else {
+        None
+    };
 
     // Flatten every account's cache into one list, tagged with the account.
     let mut rows: Vec<Row> = Vec::new();
@@ -166,7 +202,7 @@ async fn menu(cfg: &Config) -> Result<()> {
             rows.push(Row {
                 line: format!("[{}] ⭐ Saved Messages", account.label),
                 id: Some(entry.id),
-                icon: avatar_for(entry.id),
+                icon: avatar_for(entry.id).or_else(|| placeholder.clone()),
                 target: Target::Chat {
                     switch_key: account.switch_key.clone(),
                     entry,
@@ -187,7 +223,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                     badge(&entry)
                 ),
                 id: Some(entry.id),
-                icon: avatar_for(entry.id),
+                icon: avatar_for(entry.id).or_else(|| placeholder.clone()),
                 target: Target::Chat {
                     switch_key: account.switch_key.clone(),
                     entry: entry.clone(),
@@ -201,7 +237,7 @@ async fn menu(cfg: &Config) -> Result<()> {
                         account.label, entry.name, topic.title
                     ),
                     id: Some(entry.id),
-                    icon: avatar_for(entry.id),
+                    icon: avatar_for(entry.id).or_else(|| placeholder.clone()),
                     target: Target::Topic {
                         switch_key: account.switch_key.clone(),
                         entry: entry.clone(),

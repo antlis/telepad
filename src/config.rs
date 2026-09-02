@@ -96,7 +96,18 @@ pub fn frecency_path() -> PathBuf {
     data_dir().join("frecency.json")
 }
 
+/// Directory holding cached profile photos (populated by `sync --avatars`).
+pub fn avatars_dir() -> PathBuf {
+    data_dir().join("avatars")
+}
+
 /// Cached profile photo for a peer (downloaded only by `sync --avatars`).
 pub fn avatar_path(id: i64) -> PathBuf {
-    data_dir().join("avatars").join(format!("{id}.jpg"))
+    avatars_dir().join(format!("{id}.jpg"))
+}
+
+/// Generic fallback icon shown for rows without a cached avatar (written on
+/// demand the first time it's needed).
+pub fn placeholder_avatar_path() -> PathBuf {
+    data_dir().join("placeholder-avatar.svg")
 }

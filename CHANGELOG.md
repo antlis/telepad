@@ -5,6 +5,14 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-09-02
+
+### Added
+- **Placeholder avatar.** Rows without a cached photo get a neutral silhouette
+  icon, so the list looks even once avatars are present. Only applied when at
+  least one avatar exists — a menu that never ran `sync --avatars` stays a clean
+  icon-less text list.
+
 ## [0.8.0] - 2026-09-02
 
 ### Added
@@ -94,6 +102,7 @@ your accounts.
   `com.ayugram.desktop`), avoiding the second-process race that kills the window.
 - `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
 
+[0.8.1]: https://github.com/antlis/telepad/releases/tag/v0.8.1
 [0.8.0]: https://github.com/antlis/telepad/releases/tag/v0.8.0
 [0.7.0]: https://github.com/antlis/telepad/releases/tag/v0.7.0
 [0.6.0]: https://github.com/antlis/telepad/releases/tag/v0.6.0
