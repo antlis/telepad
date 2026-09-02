@@ -98,6 +98,15 @@ enum Target {
     },
 }
 
+/// A trailing `  ·  @handle` fragment, so rows are searchable by public username
+/// too. Empty when the peer has no `@username`.
+fn handle(entry: &cache::Entry) -> String {
+    match &entry.username {
+        Some(u) => format!("  ·  @{u}"),
+        None => String::new(),
+    }
+}
+
 fn badge(entry: &cache::Entry) -> &'static str {
     if !entry.topics.is_empty() {
         return "forum ▸";
@@ -121,7 +130,13 @@ async fn menu(cfg: &Config) -> Result<()> {
         }
         let account_cache = cache::read(&account.session)?;
         for entry in account_cache.entries {
-            lines.push(format!("[{}] {}  ·  {}", account.label, entry.name, badge(&entry)));
+            lines.push(format!(
+                "[{}] {}{}  ·  {}",
+                account.label,
+                entry.name,
+                handle(&entry),
+                badge(&entry)
+            ));
             targets.push(Target::Chat {
                 switch_key: account.switch_key.clone(),
                 entry: entry.clone(),
@@ -188,7 +203,11 @@ async fn menu(cfg: &Config) -> Result<()> {
         } => {
             let mut lines = Vec::with_capacity(entries.len() + 1);
             lines.push("🗄 Open Archive folder in AyuGram".to_string());
-            lines.extend(entries.iter().map(|e| format!("{}  ·  {}", e.name, badge(e))));
+            lines.extend(
+                entries
+                    .iter()
+                    .map(|e| format!("{}{}  ·  {}", e.name, handle(e), badge(e))),
+            );
             match rofi::pick(&format!("{label} ▸ archived"), &lines)? {
                 None => Ok(()), // cancelled
                 Some(0) => {
@@ -209,7 +228,7 @@ async fn menu(cfg: &Config) -> Result<()> {
         } => {
             let lines: Vec<String> = entries
                 .iter()
-                .map(|e| format!("{}  ·  {}", e.name, badge(e)))
+                .map(|e| format!("{}{}  ·  {}", e.name, handle(e), badge(e)))
                 .collect();
             match rofi::pick(&format!("📁 {title}"), &lines)? {
                 None => Ok(()), // cancelled

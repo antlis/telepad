@@ -32,7 +32,8 @@ zero context switch.
 
 ## Features
 
-- Fuzzy jump to any **chat, group, channel, or contact**, across all accounts
+- Fuzzy jump to any **chat, group, channel, or contact**, across all accounts —
+  searchable by **display name or `@handle`** (public usernames show in the row)
 - **Forum topics**: every topic is a flat, searchable row (`Forum ▸ Topic  ·  topic`)
   so you can jump straight to one on the first keystroke — or select the forum itself
   to browse its topics in a submenu
@@ -130,7 +131,9 @@ telepad login <acct>    # (re)authenticate an account
 ```
 
 Rows are tagged `[Account]`, so type an account name to scope (`work signals`) or
-just the chat name (`signals`). Forum rows show `forum ▸`, and each of their topics
+just the chat name (`signals`). Peers with a public username show their `@handle`
+in the row, so you can search by either the display name or the handle
+(`@durov`). Forum rows show `forum ▸`, and each of their topics
 appears as its own `Forum ▸ Topic  ·  topic` row for direct jumping. Chat folders
 show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 
