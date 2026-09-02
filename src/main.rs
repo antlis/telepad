@@ -139,7 +139,30 @@ async fn menu(cfg: &Config) -> Result<()> {
             continue;
         }
         let account_cache = cache::read(&account.session)?;
+        // A guaranteed Saved Messages row per account (self-chat). Omitted for
+        // stale caches synced before `me_id` was captured.
+        if account_cache.me_id != 0 {
+            let entry = cache::Entry {
+                name: "Saved Messages".to_string(),
+                username: account_cache.me_username.clone(),
+                id: account_cache.me_id,
+                kind: "user".to_string(),
+                topics: Vec::new(),
+            };
+            rows.push(Row {
+                line: format!("[{}] ⭐ Saved Messages", account.label),
+                id: Some(entry.id),
+                target: Target::Chat {
+                    switch_key: account.switch_key.clone(),
+                    entry,
+                },
+            });
+        }
         for entry in account_cache.entries {
+            // Skip the self-chat here; it's already the Saved Messages row above.
+            if entry.id == account_cache.me_id {
+                continue;
+            }
             rows.push(Row {
                 line: format!(
                     "[{}] {}{}  ·  {}",

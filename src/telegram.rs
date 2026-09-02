@@ -108,6 +108,11 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
         ));
     }
 
+    // The account's own identity, for the Saved Messages row.
+    let me = client.get_me().await.context("fetching self user")?;
+    let me_id = me.id().to_string().parse().unwrap_or(0);
+    let me_username = me.username().map(str::to_string);
+
     let mut entries = Vec::new();
     let mut dialogs = client.iter_dialogs();
     while let Some(dialog) = dialogs.next().await? {
@@ -153,6 +158,8 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account) -> Result<AccountCac
     Ok(AccountCache {
         acc: account.acc,
         label: account.label.clone(),
+        me_id,
+        me_username,
         entries,
         archived,
         folders,

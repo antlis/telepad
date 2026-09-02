@@ -41,6 +41,13 @@ pub struct AccountCache {
     pub acc: i32,
     /// Label shown in rofi.
     pub label: String,
+    /// This account's own user id, used for the Saved Messages row. 0 if a stale
+    /// cache predates this field (the row is simply omitted until the next sync).
+    #[serde(default)]
+    pub me_id: i64,
+    /// This account's own @username, if any (for the Saved Messages deep link).
+    #[serde(default)]
+    pub me_username: Option<String>,
     pub entries: Vec<Entry>,
     /// Archived chats (folder 1), surfaced behind a separate menu item.
     #[serde(default)]
