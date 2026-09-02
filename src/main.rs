@@ -74,6 +74,12 @@ enum Target {
         switch_key: String,
         entry: cache::Entry,
     },
+    /// A single forum topic, listed flat so it's searchable on first keystroke.
+    Topic {
+        switch_key: String,
+        entry: cache::Entry,
+        topic_id: i64,
+    },
     /// This account's archive folder — expands into a submenu of archived chats.
     Archive {
         switch_key: String,
@@ -108,8 +114,20 @@ async fn menu(cfg: &Config) -> Result<()> {
             lines.push(format!("[{}] {}  ·  {}", account.label, entry.name, badge(&entry)));
             targets.push(Target::Chat {
                 switch_key: account.switch_key.clone(),
-                entry,
+                entry: entry.clone(),
             });
+            // Also surface each forum topic as its own flat, searchable row.
+            for topic in &entry.topics {
+                lines.push(format!(
+                    "[{}] {} ▸ {}  ·  topic",
+                    account.label, entry.name, topic.title
+                ));
+                targets.push(Target::Topic {
+                    switch_key: account.switch_key.clone(),
+                    entry: entry.clone(),
+                    topic_id: topic.id,
+                });
+            }
         }
         if !account_cache.archived.is_empty() {
             lines.push(format!(
@@ -135,6 +153,11 @@ async fn menu(cfg: &Config) -> Result<()> {
 
     match &targets[index] {
         Target::Chat { switch_key, entry } => open_entry(cfg, switch_key, entry),
+        Target::Topic {
+            switch_key,
+            entry,
+            topic_id,
+        } => switch_and_open(cfg, switch_key, &link::build_topic(entry, *topic_id)),
         Target::Archive {
             switch_key,
             label,
@@ -176,10 +199,14 @@ fn open_entry(cfg: &Config, switch_key: &str, entry: &cache::Entry) -> Result<()
         }
     };
 
-    // Switch to the target account (safe key path), then open in it.
-    // A failed switch is non-fatal: we still try to open in the active account.
+    switch_and_open(cfg, switch_key, &url)
+}
+
+/// Switch to the target account (safe key path), then open the URL in it.
+/// A failed switch is non-fatal: we still try to open in the active account.
+fn switch_and_open(cfg: &Config, switch_key: &str, url: &str) -> Result<()> {
     if let Err(e) = link::switch_account(switch_key, &cfg.focus_cmd, &cfg.window_class) {
         eprintln!("warning: account switch failed: {e}");
     }
-    link::open(&url)
+    link::open(url)
 }

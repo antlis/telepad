@@ -33,7 +33,9 @@ zero context switch.
 ## Features
 
 - Fuzzy jump to any **chat, group, channel, or contact**, across all accounts
-- **Forum topics**: selecting a forum opens a second menu of its topics
+- **Forum topics**: every topic is a flat, searchable row (`Forum ▸ Topic  ·  topic`)
+  so you can jump straight to one on the first keystroke — or select the forum itself
+  to browse its topics in a submenu
 - **Archive**: a `🗄 Archived` entry per account — open the archive folder, or jump
   straight to any archived chat
 - **Contacts included** — even blocked users or people you have no open chat with
@@ -126,7 +128,8 @@ telepad login <acct>    # (re)authenticate an account
 ```
 
 Rows are tagged `[Account]`, so type an account name to scope (`work signals`) or
-just the chat name (`signals`). Forum rows show `forum ▸`.
+just the chat name (`signals`). Forum rows show `forum ▸`, and each of their topics
+appears as its own `Forum ▸ Topic  ·  topic` row for direct jumping.
 
 ## Config reference
 
