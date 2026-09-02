@@ -1,0 +1,89 @@
+# Changelog
+
+All notable changes to telepad are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.7.0] - 2026-09-02
+
+### Added
+- **Saved Messages row.** A guaranteed `⭐ Saved Messages` entry per account.
+  `sync` now captures each account's own user id and `@username` (`get_me`), and
+  the menu renders the self-chat as a normal jump target — so it switches to the
+  right account and participates in frecency ranking.
+
+### Changed
+- The self-chat is de-duplicated out of the normal dialog list (no more a
+  `YourName · dm` row alongside `⭐ Saved Messages`).
+
+### Notes
+- Requires a re-sync (`telepad sync`) to populate the new self identity; caches
+  from older versions simply omit the row until then.
+
+## [0.6.0] - 2026-09-02
+
+### Added
+- **Frecency ranking.** Every jump is recorded to `frecency.json` (peer id →
+  visit count + last-used, with a 30-day recency half-life), and the flat list is
+  stable-sorted by that score so your most-used chats float to the top. Recording
+  is best-effort and never blocks or fails an open; never-jumped rows keep their
+  prior order.
+
+## [0.5.0] - 2026-09-02
+
+### Added
+- **`@handle` in rows.** Peers with a public username show their `@handle` as a
+  searchable segment, so rofi's fuzzy match finds them by display name *or*
+  username. Rendered in the flat list and the archive/folder submenus. No re-sync
+  needed — the username was already cached.
+
+### Documentation
+- Caveat that fancy Unicode "font" names (styled math/pseudo-font codepoints)
+  won't match a normal-text fuzzy search.
+
+## [0.4.0] - 2026-09-02
+
+### Added
+- **Chat folders.** Each Telegram folder (dialog filter) shows as a
+  `📁 <Folder> ▸` row that expands into a submenu of that folder's chats.
+
+## [0.3.0] - 2026-09-02
+
+### Added
+- **Flat forum topics.** Every forum topic is surfaced as its own searchable
+  `Forum ▸ Topic` row in the main menu, so you can jump straight to a topic on the
+  first keystroke (selecting the forum itself still opens its topic submenu).
+
+## [0.2.0] - 2026-09-02
+
+### Added
+- **Archive browsing.** A `🗄 Archived` entry per account: open the archive folder
+  view, or jump straight to a specific archived chat.
+
+### Chores
+- Ignore real config, session, and cache files.
+
+## [0.1.0] - 2026-09-01
+
+Initial release: a rofi quick-switcher that jumps AyuGram to any chat across all
+your accounts.
+
+### Added
+- Fuzzy jump to any chat, group, channel, or contact — across all accounts in one
+  flat list, including contacts you have no open chat with (e.g. blocked ones).
+- Forum topics as two-level jump targets (forum → topic submenu).
+- Cross-account switching: focuses the client and injects the account's bound
+  switch key via `xdotool` before opening (the safe path; the deep-link `acc=`
+  switch crashes AyuGram).
+- In-process navigation over D-Bus (`org.freedesktop.Application.Open` on
+  `com.ayugram.desktop`), avoiding the second-process race that kills the window.
+- `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
+
+[0.7.0]: https://github.com/antlis/telepad/releases/tag/v0.7.0
+[0.6.0]: https://github.com/antlis/telepad/releases/tag/v0.6.0
+[0.5.0]: https://github.com/antlis/telepad/releases/tag/v0.5.0
+[0.4.0]: https://github.com/antlis/telepad/releases/tag/v0.4.0
+[0.3.0]: https://github.com/antlis/telepad/releases/tag/v0.3.0
+[0.2.0]: https://github.com/antlis/telepad/releases/tag/v0.2.0
+[0.1.0]: https://github.com/antlis/telepad/releases/tag/v0.1.0
