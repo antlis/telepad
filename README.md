@@ -177,10 +177,32 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 
 - [ ] **Test against vanilla Telegram Desktop** — make the D-Bus name, `tg://` scheme,
       and id-based open configurable so it isn't AyuGram-only.
-- [ ] **Reduce dependencies / decouple from rofi + i3** — ideally a single
-      self-contained binary with its own minimal picker (or a pluggable menu backend)
-      and a WM-agnostic focus/switch mechanism, so it isn't tied to rofi, i3, and
-      xdotool. Goal: one package, few/no external CLI deps.
+- [ ] **Decouple from rofi + i3 + xdotool — become composable plumbing.** Turn
+      telepad into Unix-pipe primitives so anyone can bring their own picker and
+      focuser:
+      - `telepad list` prints every jumpable target as a flat, machine-readable
+        stream (one line per chat / topic / folder-chat / archived-chat).
+      - `telepad open` takes a selected line back (stdin/arg), maps it to its
+        target by re-deriving the same list from cache, then runs switch + open.
+      - `telepad menu` stays the batteries-included default (pipes `list` into
+        the menu command and dispatches `open`), so it's still zero-config — but
+        power users can just do `telepad list | fzf | telepad open`.
+
+      All four external touchpoints become configurable commands with `{…}`
+      placeholder substitution, exactly like today's `focus_cmd` / `{class}`:
+
+      | hook | default | unlocks |
+      |------|---------|---------|
+      | `menu_cmd`   | `rofi -dmenu` | dmenu / fzf / wofi / any picker |
+      | `focus_cmd`  | i3-msg *(exists today)* | other WMs |
+      | `inject_cmd` | `xdotool key --clearmodifiers {key}` | ydotool / Wayland |
+      | `open_cmd`   | gdbus … `com.ayugram.desktop` … `{url}` | vanilla Telegram Desktop |
+
+      A single flat `list` stream implies folders/archive would render as flat
+      rows (`📁 Folder ▸ Chat`, `🗄 Chat`) instead of interactive submenus —
+      mirroring how forum topics are already flattened. Also subsumes the vanilla
+      Telegram Desktop item above (`open_cmd` makes the D-Bus name/scheme
+      configurable). Goal: few/no hardcoded external CLI deps.
 - [ ] Investigate a non-crashing account switch (upstream fix to the `tg://…&acc=`
       handler would remove the whole xdotool detour).
 - [ ] Include recent/top peers (`contacts.getTopPeers`) for non-contact recents.
