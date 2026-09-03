@@ -331,7 +331,8 @@ async fn menu(cfg: &Config) -> Result<()> {
                 None => Ok(()), // cancelled
                 Some(0) => {
                     // Open the archive folder view (switch account + Ctrl+9).
-                    if let Err(e) = link::open_archive(switch_key, &cfg.focus_cmd, &cfg.window_class)
+                    if let Err(e) =
+                        link::open_archive(switch_key, &cfg.focus_cmd, &cfg.window_class())
                     {
                         eprintln!("warning: could not open archive folder: {e}");
                     }
@@ -386,8 +387,8 @@ fn open_entry(
 /// Switch to the target account (safe key path), then open the URL in it.
 /// A failed switch is non-fatal: we still try to open in the active account.
 fn switch_and_open(cfg: &Config, switch_key: &str, url: &str) -> Result<()> {
-    if let Err(e) = link::switch_account(switch_key, &cfg.focus_cmd, &cfg.window_class) {
+    if let Err(e) = link::switch_account(switch_key, &cfg.focus_cmd, &cfg.window_class()) {
         eprintln!("warning: account switch failed: {e}");
     }
-    link::open(url)
+    link::open(&cfg.dbus_service(), &cfg.dbus_object_path(), url)
 }

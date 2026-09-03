@@ -119,24 +119,25 @@ fn tdesktop_peer_id(bot_id: i64) -> u64 {
     }
 }
 
-/// Deliver each URL in order, in-process, to the running AyuGram over D-Bus.
+/// Deliver the URL, in-process, to the running client over D-Bus.
 ///
-/// AyuGram owns `com.ayugram.desktop` and implements
-/// `org.freedesktop.Application.Open`, which navigates the *existing* window
-/// without spawning anything. This is the only route that doesn't create a
-/// second `AyuGram` process — on this platform spawning a competing process
-/// (via `xdg-open` or a direct `AyuGram -- <url>` exec) reliably kills the
-/// running primary. When AyuGram isn't running, the same call D-Bus-activates a
-/// fresh instance and opens the chat. Both are safe.
-pub fn open(url: &str) -> Result<()> {
+/// `service` is the client's well-known name (e.g. `org.telegram.desktop` or
+/// `com.ayugram.desktop`) and `object_path` its object path; the client
+/// implements `org.freedesktop.Application.Open`, which navigates the *existing*
+/// window without spawning anything. This is the only route that doesn't create
+/// a second client process — on this platform spawning a competing process (via
+/// `xdg-open` or a direct `-- <url>` exec) reliably kills the running primary.
+/// When the client isn't running, the same call D-Bus-activates a fresh instance
+/// and opens the chat. Both are safe.
+pub fn open(service: &str, object_path: &str, url: &str) -> Result<()> {
     let status = Command::new("gdbus")
         .args([
             "call",
             "--session",
             "--dest",
-            "com.ayugram.desktop",
+            service,
             "--object-path",
-            "/com/ayugram/desktop",
+            object_path,
             "--method",
             "org.freedesktop.Application.Open",
             &format!("['{url}']"),

@@ -5,16 +5,22 @@
 api_id = 123456
 api_hash = "0123456789abcdef0123456789abcdef"
 
-# X11 window class of AyuGram, used to focus it before switching accounts.
-window_class = "AyuGramDesktop"
+# Which Telegram Desktop client to drive: "telegram" (default) or "ayugram".
+# This selects the D-Bus service name and X11 window class telepad talks to.
+client = "telegram"
+#
+# For any other TDesktop fork, keep `client` unset (or as-is) and override the
+# two client-specific bits explicitly:
+#   dbus_service = "org.kotatogram.desktop"   # the D-Bus name it owns
+#   window_class = "KotatogramDesktop"        # its X11 window class
 
 # One [[accounts]] block per Telegram account.
 #
-# switch_key: the key you bound *inside AyuGram* to switch to this account
-#   (AyuGram Settings → Advanced → keyboard shortcuts, command "accountN").
-#   telepad focuses AyuGram and injects this key via xdotool before opening a
-#   chat, so the jump lands in the right account. Leave empty to never switch
-#   (open in whatever account is active).
+# switch_key: the key you bound *inside the client* to switch to this account
+#   (Settings → Advanced → keyboard shortcuts, command "accountN"). telepad
+#   focuses the client and injects this key via xdotool before opening a chat,
+#   so the jump lands in the right account. Leave empty to never switch (open in
+#   whatever account is active).
 #
 #   NOTE: the tg:// `acc=` deep-link switch crashes AyuGram, so this key path is
 #   the only safe way to switch accounts from outside. Requires xdotool (X11).

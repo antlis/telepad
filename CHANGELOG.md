@@ -5,6 +5,28 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-03
+
+### Added
+- **Configurable client.** A new `client` setting (`"telegram"` or `"ayugram"`)
+  selects the D-Bus service name and X11 window class telepad drives, so it's no
+  longer hardwired to AyuGram. Vanilla Telegram Desktop is now the default. Other
+  TDesktop forks work by overriding `dbus_service` (the object path is derived
+  from it) and `window_class` directly.
+
+### Changed
+- **Default client is now vanilla Telegram Desktop.** The D-Bus name defaults to
+  `org.telegram.desktop` and the window class to `TelegramDesktop`. **AyuGram
+  users must add `client = "ayugram"` to their config** (previously the AyuGram
+  values were the built-in defaults).
+
+### Notes
+- Only the client's D-Bus name and window class are switched by `client`; the
+  `tg://` handlers themselves still differ between builds. AyuGram's `tg://chat?id=`
+  open (used for username-less users/legacy groups) may not exist on vanilla
+  Telegram Desktop — public `@username` peers and private channels (`privatepost`)
+  should work on both.
+
 ## [0.8.2] - 2026-09-02
 
 ### Fixed
@@ -112,6 +134,7 @@ your accounts.
   `com.ayugram.desktop`), avoiding the second-process race that kills the window.
 - `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
 
+[0.9.0]: https://github.com/antlis/telepad/releases/tag/v0.9.0
 [0.8.2]: https://github.com/antlis/telepad/releases/tag/v0.8.2
 [0.8.1]: https://github.com/antlis/telepad/releases/tag/v0.8.1
 [0.8.0]: https://github.com/antlis/telepad/releases/tag/v0.8.0

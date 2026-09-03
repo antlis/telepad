@@ -6,9 +6,9 @@ inside the app. It's like having a thousand browser tabs open, except worse — 
 spread across multiple accounts and buried under folders and archives.
 
 **telepad** is a **rofi quick-switcher for Telegram** — hit a hotkey from anywhere,
-fuzzy-type a few letters, and your running [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop)
-jumps straight to that chat, group, channel, contact, or **forum topic** —
-**across all your accounts**.
+fuzzy-type a few letters, and your running [Telegram Desktop](https://desktop.telegram.org/)
+(or a fork like [AyuGram](https://github.com/AyuGram/AyuGramDesktop)) jumps straight
+to that chat, group, channel, contact, or **forum topic** — **across all your accounts**.
 
 It's Discord's <kbd>Ctrl</kbd>+<kbd>K</kbd> quick-switcher, reimagined for the desktop
 Telegram client — and arguably better. Because it's a global **rofi + i3** binding,
@@ -22,13 +22,15 @@ zero context switch.
 │ per account, once: log in         │        │ flat fuzzy list across accounts    │
 │ sync: dialogs + contacts + forum  │ ─cache→ │  ↳ forum? → topic submenu          │
 │       topics → JSON cache          │        │ → (xdotool: switch account)        │
-└────────────────────────────────────┘        │ → D-Bus Open → AyuGram navigates  │
+└────────────────────────────────────┘        │ → D-Bus Open → client navigates   │
                                               └────────────────────────────────────┘
 ```
 
 > **Status:** works day-to-day for the author on X11 + i3 + AyuGram. Rough edges
-> remain — see [Caveats](#caveats) and [Roadmap](#roadmap). Notably it has **only
-> been tested against AyuGram**, not vanilla Telegram Desktop yet.
+> remain — see [Caveats](#caveats) and [Roadmap](#roadmap). The client is now
+> configurable (`client = "telegram" | "ayugram"`), defaulting to vanilla
+> Telegram Desktop, but has only been **exercised in anger against AyuGram** so
+> far — some `tg://` id-based opens may still differ on vanilla (see Caveats).
 
 ## Features
 
@@ -60,10 +62,13 @@ Two halves that talk through a small on-disk cache:
   `sync` pulls the dialog list, your contacts, each forum's topics, and your chat
   folders into a JSON cache the menu reads.
 - **Navigating** hands a `tg://` link to the running client **in-process** over
-  D-Bus (`org.freedesktop.Application.Open` on `com.ayugram.desktop`). Public peers
-  resolve by `@username`; everything else (private groups/channels, username-less
-  DMs) opens by internal peer id via the `tg://chat?id=` handler; forum topics use
-  `resolve?domain=X&topic=` (public) or `privatepost?channel=<raw>&topic=` (private).
+  D-Bus (`org.freedesktop.Application.Open` on the client's well-known name —
+  `org.telegram.desktop` for Telegram, `com.ayugram.desktop` for AyuGram, picked by
+  the `client` setting). Public peers resolve by `@username`; private
+  channels/supergroups open via `privatepost?channel=<raw>`; other username-less
+  peers (users, legacy groups) open by internal peer id via `tg://chat?id=`; forum
+  topics use `resolve?domain=X&topic=` (public) or `privatepost?channel=<raw>&topic=`
+  (private).
 
 ### Account switching (the ugly part)
 
@@ -148,7 +153,9 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 | Field | Meaning |
 |-------|---------|
 | `api_id` / `api_hash` | One app from my.telegram.org, shared by all accounts |
-| `window_class` | X11 class of the client, focused before the switch key |
+| `client` | Which client to drive: `telegram` (default) or `ayugram`. Sets the D-Bus name + window class |
+| `dbus_service` | Override the client's D-Bus name (for other TDesktop forks); object path is derived from it |
+| `window_class` | Override the X11 class of the client, focused before the switch key (else from `client`) |
 | `focus_cmd` | Shell command to focus the client; `{class}` is substituted. Default `i3-msg [class="{class}"] focus` |
 | `accounts[].acc` | 1-based slot in the client's account list (display/ordering) |
 | `accounts[].label` | Name shown in rofi |
@@ -158,9 +165,13 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 
 ## Caveats
 
-- **Only tested with AyuGram**, not vanilla Telegram Desktop. The `tg://` handlers and
-  the `com.ayugram.desktop` D-Bus name are AyuGram-specific; Telegram Desktop uses
-  `org.telegram.desktop` and lacks AyuGram's `tg://chat?id=` handler. See the TODO.
+- **Client is configurable but only battle-tested on AyuGram.** The D-Bus name and
+  window class now follow the `client` setting (`telegram` / `ayugram`), so vanilla
+  Telegram Desktop is wired up and the default. But the `tg://` *handlers* differ
+  between builds: AyuGram has a `tg://chat?id=` handler used for username-less
+  users/legacy groups, which vanilla Telegram Desktop may not — those specific jumps
+  could still fail there (public `@username` peers and private channels via
+  `privatepost` should work on both). Real-world vanilla testing is still on the TODO.
 - **Cross-account needs X11 + xdotool** and depends on window focus/timing. On Wayland
   you'd need a different injector (ydotool). Same-account is dependency-light.
 - **Separate sessions**: grammers logs in independently, so each account shows as an
@@ -181,8 +192,10 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 
 ## Roadmap / TODO
 
-- [ ] **Test against vanilla Telegram Desktop** — make the D-Bus name, `tg://` scheme,
-      and id-based open configurable so it isn't AyuGram-only.
+- [ ] **Test against vanilla Telegram Desktop.** The D-Bus name and window class are
+      now configurable via `client` (done); what's left is real-world verification and
+      handling any `tg://` handler gaps on vanilla (notably the id-based `chat?id=`
+      open, which AyuGram provides but vanilla may not).
 - [ ] **Decouple from rofi + i3 + xdotool — become composable plumbing.** Turn
       telepad into Unix-pipe primitives so anyone can bring their own picker and
       focuser:
@@ -202,13 +215,13 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
       | `menu_cmd`   | `rofi -dmenu` | dmenu / fzf / wofi / any picker |
       | `focus_cmd`  | i3-msg *(exists today)* | other WMs |
       | `inject_cmd` | `xdotool key --clearmodifiers {key}` | ydotool / Wayland |
-      | `open_cmd`   | gdbus … `com.ayugram.desktop` … `{url}` | vanilla Telegram Desktop |
+      | `open_cmd`   | gdbus … `{service}` … `{url}` | any opener (already: `client`/`dbus_service` pick the D-Bus name) |
 
       A single flat `list` stream implies folders/archive would render as flat
       rows (`📁 Folder ▸ Chat`, `🗄 Chat`) instead of interactive submenus —
-      mirroring how forum topics are already flattened. Also subsumes the vanilla
-      Telegram Desktop item above (`open_cmd` makes the D-Bus name/scheme
-      configurable). Goal: few/no hardcoded external CLI deps.
+      mirroring how forum topics are already flattened. The D-Bus name is already
+      configurable (`client` / `dbus_service`); `open_cmd` would generalize the whole
+      open command. Goal: few/no hardcoded external CLI deps.
 - [ ] Investigate a non-crashing account switch (upstream fix to the `tg://…&acc=`
       handler would remove the whole xdotool detour).
 - [ ] Include recent/top peers (`contacts.getTopPeers`) for non-contact recents.

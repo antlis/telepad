@@ -10,10 +10,20 @@ pub struct Config {
     pub api_id: i32,
     /// Telegram API hash that pairs with `api_id`.
     pub api_hash: String,
-    /// X11 window class used to focus AyuGram before injecting the switch key.
-    #[serde(default = "default_window_class")]
-    pub window_class: String,
-    /// Shell command that focuses the AyuGram window; `{class}` is replaced with
+    /// Which Telegram Desktop client to drive: "telegram" (default) or
+    /// "ayugram". Selects the D-Bus service name and X11 window class. For any
+    /// other fork, leave this and set `dbus_service` / `window_class` yourself.
+    #[serde(default = "default_client")]
+    pub client: String,
+    /// Override the X11 window class (else derived from `client`), focused
+    /// before injecting the switch key.
+    #[serde(default)]
+    window_class: Option<String>,
+    /// Override the D-Bus service name the client owns (else derived from
+    /// `client`). Handy for TDesktop forks without a built-in `client` preset.
+    #[serde(default)]
+    dbus_service: Option<String>,
+    /// Shell command that focuses the client window; `{class}` is replaced with
     /// `window_class`. Default targets i3. For other setups override it, e.g.
     /// `wmctrl -xa {class}`.
     #[serde(default = "default_focus_cmd")]
@@ -43,12 +53,34 @@ pub struct Account {
     pub switch_key: String,
 }
 
-fn default_window_class() -> String {
-    "AyuGramDesktop".to_string()
+fn default_client() -> String {
+    "telegram".to_string()
 }
 
 fn default_focus_cmd() -> String {
     r#"i3-msg [class="{class}"] focus"#.to_string()
+}
+
+/// Built-in D-Bus service name and X11 window class for a known client.
+struct ClientProfile {
+    dbus_service: &'static str,
+    window_class: &'static str,
+}
+
+/// The clients telepad ships presets for. Any other TDesktop fork works by
+/// setting `dbus_service` / `window_class` in the config instead.
+fn client_profile(client: &str) -> Option<ClientProfile> {
+    match client {
+        "telegram" => Some(ClientProfile {
+            dbus_service: "org.telegram.desktop",
+            window_class: "TelegramDesktop",
+        }),
+        "ayugram" => Some(ClientProfile {
+            dbus_service: "com.ayugram.desktop",
+            window_class: "AyuGramDesktop",
+        }),
+        _ => None,
+    }
 }
 
 impl Config {
@@ -60,6 +92,14 @@ impl Config {
         if config.accounts.is_empty() {
             return Err(anyhow!("no [[accounts]] configured in {}", path.display()));
         }
+        // An unknown `client` is only OK if the D-Bus name is given explicitly.
+        if client_profile(&config.client).is_none() && config.dbus_service.is_none() {
+            return Err(anyhow!(
+                "unknown client '{}' — use client = \"telegram\" or \"ayugram\", \
+                 or set `dbus_service` (and `window_class`) explicitly",
+                config.client
+            ));
+        }
         Ok(config)
     }
 
@@ -67,6 +107,32 @@ impl Config {
         self.accounts
             .iter()
             .find(|a| a.session == key || a.label == key || a.acc.to_string() == key)
+    }
+
+    /// X11 window class of the client, focused before injecting the switch key.
+    /// The explicit `window_class` override wins; otherwise it's the `client`
+    /// preset's class.
+    pub fn window_class(&self) -> String {
+        self.window_class
+            .clone()
+            .or_else(|| client_profile(&self.client).map(|p| p.window_class.to_string()))
+            .unwrap_or_default()
+    }
+
+    /// D-Bus well-known name the client owns (it implements
+    /// `org.freedesktop.Application`). Override wins over the `client` preset.
+    pub fn dbus_service(&self) -> String {
+        self.dbus_service
+            .clone()
+            .or_else(|| client_profile(&self.client).map(|p| p.dbus_service.to_string()))
+            .unwrap_or_default()
+    }
+
+    /// Object path for the D-Bus service: the well-known name with dots turned
+    /// into slashes and a leading slash (the `org.freedesktop.Application`
+    /// convention, e.g. `org.telegram.desktop` → `/org/telegram/desktop`).
+    pub fn dbus_object_path(&self) -> String {
+        format!("/{}", self.dbus_service().replace('.', "/"))
     }
 }
 
