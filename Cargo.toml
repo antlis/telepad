@@ -4,6 +4,9 @@ version = "0.10.0"
 edition = "2024"
 description = "Rofi quick-switcher that jumps AyuGram/Telegram Desktop to any chat, group or channel across all your accounts"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/antlis/telepad"
+homepage = "https://github.com/antlis/telepad"
+readme = "README.md"
 keywords = ["rofi", "telegram", "ayugram", "launcher", "grammers"]
 categories = ["command-line-utilities"]
 
