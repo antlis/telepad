@@ -22,7 +22,7 @@ zero context switch.
 ┌─ data layer (grammers / MTProto) ─┐        ┌─ front-end (rofi) ─────────────────┐
 │ per account, once: log in         │        │ flat fuzzy list across accounts    │
 │ sync: dialogs + contacts + forum  │ ─cache→ │  ↳ forum? → topic submenu          │
-│       topics → JSON cache          │        │ → (xdotool: switch account)        │
+│       topics → JSON cache          │        │ → (inject_cmd: switch account)     │
 └────────────────────────────────────┘        │ → D-Bus Open → client navigates   │
                                               └────────────────────────────────────┘
 ```
