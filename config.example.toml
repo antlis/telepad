@@ -14,16 +14,32 @@ client = "telegram"
 #   dbus_service = "org.kotatogram.desktop"   # the D-Bus name it owns
 #   window_class = "KotatogramDesktop"        # its X11 window class
 
+# Window-manager integration — only needed if you use multiple accounts (to
+# focus the client and press its account-switch shortcut). Both are shell
+# commands with placeholders; the defaults target X11 + i3.
+#
+# focus_cmd: focuses the client window. `{class}` → window_class.
+#   i3 (default):  i3-msg [class="{class}"] focus
+#   other X11 WMs: wmctrl -xa {class}
+#   sway:          swaymsg [app_id={class}] focus
+#   hyprland:      hyprctl dispatch focuswindow class:{class}
+# focus_cmd = "i3-msg [class=\"{class}\"] focus"
+#
+# inject_cmd: presses a key chord in the focused window. `{key}` → e.g. "alt+1".
+#   X11 (default): xdotool key --clearmodifiers {key}
+#   Wayland:       ydotool key {key}    (or wtype)
+# inject_cmd = "xdotool key --clearmodifiers {key}"
+
 # One [[accounts]] block per Telegram account.
 #
 # switch_key: the key you bound *inside the client* to switch to this account
-#   (Settings → Advanced → keyboard shortcuts, command "accountN"). telepad
-#   focuses the client and injects this key via xdotool before opening a chat,
-#   so the jump lands in the right account. Leave empty to never switch (open in
-#   whatever account is active).
+#   (Settings → Advanced → keyboard shortcuts, command "accountN"). telepad runs
+#   focus_cmd then inject_cmd with this key before opening a chat, so the jump
+#   lands in the right account. Leave empty to never switch (open in whatever
+#   account is active).
 #
 #   NOTE: the tg:// `acc=` deep-link switch crashes AyuGram, so this key path is
-#   the only safe way to switch accounts from outside. Requires xdotool (X11).
+#   the only safe way to switch accounts from outside.
 
 [[accounts]]
 acc = 1

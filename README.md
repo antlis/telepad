@@ -11,8 +11,9 @@ fuzzy-type a few letters, and your running [Telegram Desktop](https://desktop.te
 to that chat, group, channel, contact, or **forum topic** — **across all your accounts**.
 
 It's Discord's <kbd>Ctrl</kbd>+<kbd>K</kbd> quick-switcher, reimagined for the desktop
-Telegram client — and arguably better. Because it's a global **rofi + i3** binding,
-you trigger it from *any* window: your editor, terminal, browser, anything. No need to
+Telegram client — and arguably better. Because it's a global **rofi** keybinding
+(bound in your WM), you trigger it from *any* window: your editor, terminal, browser,
+anything. No need to
 first focus the app. Where Discord makes you *focus Discord → Ctrl+K → type → jump*,
 telepad is just *hotkey → type → jump* from wherever you already are — fewer keystrokes,
 zero context switch.
@@ -73,8 +74,9 @@ Two halves that talk through a small on-disk cache:
 ### Account switching (the ugly part)
 
 Switching account is done by **injecting the keypress you bound in the client**
-(e.g. `alt+2`) via `xdotool`, *not* by any `tg://` parameter. This is deliberate and
-worth understanding:
+(e.g. `alt+2`) via a **configurable key-injector** (`inject_cmd`, default
+`xdotool`), *not* by any `tg://` parameter. This is deliberate and worth
+understanding:
 
 - `tg://…&acc=N` **crashes** AyuGram. The deep-link account-switch path segfaults in
   the builds tested (on Nix it dies silently — no crash dump, truncated log).
@@ -85,17 +87,21 @@ worth understanding:
   client's own account-switch shortcut with a real keypress — the same switch you'd
   do by hand, which is safe.
 
-Consequently, cross-account jumping needs: **X11**, **xdotool**, a window-focus
-command (default `i3-msg`), and the account-switch keys bound **inside** the client.
-Leave `switch_key` empty to stay same-account only (rock-solid, no xdotool needed).
+Consequently, cross-account jumping needs two configurable shell commands — a
+**window-focuser** (`focus_cmd`, default `i3-msg`) and a **key-injector**
+(`inject_cmd`, default `xdotool`) — plus the account-switch keys bound **inside**
+the client. Both default to X11 + i3 but are overridable for any WM, X11 or
+Wayland (see [Configuration](#configuration)). Leave `switch_key` empty to stay
+same-account only (rock-solid, no focuser/injector needed).
 
 ## Requirements
 
 - **Rust** (to build)
 - **rofi** — the menu
 - **gdbus** (GLib) — delivers the URL to the running client
-- **xdotool** + an **X11** session — only for cross-account switching
-- a focuser — default `i3-msg` (override `focus_cmd` for other WMs)
+- for cross-account switching only: a **window-focuser** and a **key-injector** —
+  defaults `i3-msg` + `xdotool` (X11); override `focus_cmd` / `inject_cmd` for
+  other WMs (e.g. `swaymsg`/`hyprctl` + `ydotool` on Wayland)
 
 ## Install
 
@@ -156,12 +162,13 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
 | `client` | Which client to drive: `telegram` (default) or `ayugram`. Sets the D-Bus name + window class |
 | `dbus_service` | Override the client's D-Bus name (for other TDesktop forks); object path is derived from it |
 | `window_class` | Override the X11 class of the client, focused before the switch key (else from `client`) |
-| `focus_cmd` | Shell command to focus the client; `{class}` is substituted. Default `i3-msg [class="{class}"] focus` |
+| `focus_cmd` | Shell command to focus the client; `{class}` substituted. Default `i3-msg [class="{class}"] focus`. Override for other WMs (`wmctrl`, `swaymsg`, `hyprctl`) |
+| `inject_cmd` | Shell command to press a key chord; `{key}` substituted. Default `xdotool key --clearmodifiers {key}` (X11). Override for Wayland (`ydotool`, `wtype`) |
 | `accounts[].acc` | 1-based slot in the client's account list (display/ordering) |
 | `accounts[].label` | Name shown in rofi |
 | `accounts[].session` | Session file name under `~/.local/share/telepad/` |
 | `accounts[].phone` | International format; used only for `telepad login` |
-| `accounts[].switch_key` | xdotool key that switches to this account (e.g. `alt+1`); empty = never switch |
+| `accounts[].switch_key` | Key chord that switches to this account (e.g. `alt+1`), sent via `inject_cmd`; empty = never switch |
 
 ## Caveats
 
@@ -172,8 +179,9 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
   users/legacy groups, which vanilla Telegram Desktop may not — those specific jumps
   could still fail there (public `@username` peers and private channels via
   `privatepost` should work on both). Real-world vanilla testing is still on the TODO.
-- **Cross-account needs X11 + xdotool** and depends on window focus/timing. On Wayland
-  you'd need a different injector (ydotool). Same-account is dependency-light.
+- **Cross-account depends on a focuser + key-injector** and on window focus/timing.
+  Defaults are X11 (`i3-msg` + `xdotool`); Wayland works by pointing `focus_cmd` /
+  `inject_cmd` at `swaymsg`/`hyprctl` + `ydotool`. Same-account is dependency-light.
 - **Separate sessions**: grammers logs in independently, so each account shows as an
   extra device in your Telegram sessions list.
 - **Stale cache**: the list is a snapshot; re-run `telepad sync` to pick up new chats.
@@ -196,9 +204,10 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
       now configurable via `client` (done); what's left is real-world verification and
       handling any `tg://` handler gaps on vanilla (notably the id-based `chat?id=`
       open, which AyuGram provides but vanilla may not).
-- [ ] **Decouple from rofi + i3 + xdotool — become composable plumbing.** Turn
-      telepad into Unix-pipe primitives so anyone can bring their own picker and
-      focuser:
+- [ ] **Decouple from rofi — become composable plumbing.** The WM/injector are
+      already configurable (`focus_cmd` / `inject_cmd`); the picker (`rofi`) is the
+      last hardcoded touchpoint. Turn telepad into Unix-pipe primitives so anyone
+      can bring their own picker too:
       - `telepad list` prints every jumpable target as a flat, machine-readable
         stream (one line per chat / topic / folder-chat / archived-chat).
       - `telepad open` takes a selected line back (stdin/arg), maps it to its
@@ -214,7 +223,7 @@ show as `📁 <Folder> ▸` rows that expand into that folder's chats.
       |------|---------|---------|
       | `menu_cmd`   | `rofi -dmenu` | dmenu / fzf / wofi / any picker |
       | `focus_cmd`  | i3-msg *(exists today)* | other WMs |
-      | `inject_cmd` | `xdotool key --clearmodifiers {key}` | ydotool / Wayland |
+      | `inject_cmd` | xdotool *(exists today)* | ydotool / Wayland |
       | `open_cmd`   | gdbus … `{service}` … `{url}` | any opener (already: `client`/`dbus_service` pick the D-Bus name) |
 
       A single flat `list` stream implies folders/archive would render as flat

@@ -49,37 +49,51 @@ pub fn build_topic(entry: &Entry, topic_id: i64) -> String {
     }
 }
 
-/// Switch AyuGram to an account by focusing its window (via `focus_cmd`) and
-/// injecting the user-configured key (e.g. "alt+1"). This drives AyuGram's own
-/// account-switch shortcut — the safe path — instead of the deep-link `acc=`
-/// switch that crashes. Requires the focuser (default i3-msg) and `xdotool`
-/// (X11). No-op if `key` is empty.
-pub fn switch_account(key: &str, focus_cmd: &str, window_class: &str) -> Result<()> {
+/// Switch the client to an account by focusing its window (via `focus_cmd`) and
+/// injecting the user-configured key (e.g. "alt+1") via `inject_cmd`. This drives
+/// the client's own account-switch shortcut — the safe path — instead of the
+/// deep-link `acc=` switch that crashes AyuGram. No-op if `key` is empty.
+pub fn switch_account(
+    key: &str,
+    focus_cmd: &str,
+    inject_cmd: &str,
+    window_class: &str,
+) -> Result<()> {
     if key.is_empty() {
         return Ok(());
     }
-    focus_and_keys(focus_cmd, window_class, &[key])
+    focus_and_keys(focus_cmd, inject_cmd, window_class, &[key])
 }
 
-/// Open AyuGram's archive folder view: switch to the account (if a key is set),
-/// then inject Ctrl+9 (AyuGram's `ShowArchive` shortcut). There's no `tg://` for
+/// Open the client's archive folder view: switch to the account (if a key is
+/// set), then inject Ctrl+9 (the `ShowArchive` shortcut). There's no `tg://` for
 /// the archive folder, so this is the only way to focus it.
-pub fn open_archive(switch_key: &str, focus_cmd: &str, window_class: &str) -> Result<()> {
+pub fn open_archive(
+    switch_key: &str,
+    focus_cmd: &str,
+    inject_cmd: &str,
+    window_class: &str,
+) -> Result<()> {
     let mut keys: Vec<&str> = Vec::new();
     if !switch_key.is_empty() {
         keys.push(switch_key);
     }
     keys.push("ctrl+9");
-    focus_and_keys(focus_cmd, window_class, &keys)
+    focus_and_keys(focus_cmd, inject_cmd, window_class, &keys)
 }
 
-/// Focus AyuGram (via `focus_cmd`), then inject each key in order with a small
-/// settle delay between them.
+/// Focus the client (via `focus_cmd`), then inject each key in order (via
+/// `inject_cmd`, `{key}` substituted) with a small settle delay between them.
 ///
 /// xdotool's own `windowactivate` is unreliable on i3 (it blocks/warns on
 /// `_NET_WM_DESKTOP`), so focusing is delegated to a WM-native command; keys are
 /// then sent to whatever is now focused.
-fn focus_and_keys(focus_cmd: &str, window_class: &str, keys: &[&str]) -> Result<()> {
+fn focus_and_keys(
+    focus_cmd: &str,
+    inject_cmd: &str,
+    window_class: &str,
+    keys: &[&str],
+) -> Result<()> {
     let focus = focus_cmd.replace("{class}", window_class);
     let status = Command::new("sh").arg("-c").arg(&focus).status()?;
     if !status.success() {
@@ -88,13 +102,10 @@ fn focus_and_keys(focus_cmd: &str, window_class: &str, keys: &[&str]) -> Result<
     std::thread::sleep(std::time::Duration::from_millis(150));
 
     for key in keys {
-        let status = Command::new("xdotool")
-            .args(["key", "--clearmodifiers", key])
-            .status()?;
+        let inject = inject_cmd.replace("{key}", key);
+        let status = Command::new("sh").arg("-c").arg(&inject).status()?;
         if !status.success() {
-            return Err(anyhow!(
-                "xdotool failed to send '{key}' (is xdotool installed?)"
-            ));
+            return Err(anyhow!("inject command failed: {inject}"));
         }
         // Let the action (account switch / folder open) settle before the next.
         std::thread::sleep(std::time::Duration::from_millis(250));

@@ -24,10 +24,16 @@ pub struct Config {
     #[serde(default)]
     dbus_service: Option<String>,
     /// Shell command that focuses the client window; `{class}` is replaced with
-    /// `window_class`. Default targets i3. For other setups override it, e.g.
-    /// `wmctrl -xa {class}`.
+    /// `window_class`. Default targets i3. For other WMs override it, e.g.
+    /// `wmctrl -xa {class}` (X11), `swaymsg [app_id={class}] focus`, or
+    /// `hyprctl dispatch focuswindow class:{class}` (Wayland).
     #[serde(default = "default_focus_cmd")]
     pub focus_cmd: String,
+    /// Shell command that injects a key chord into the focused window; `{key}`
+    /// is replaced with the chord (e.g. "alt+1"). Default uses xdotool (X11).
+    /// On Wayland override it, e.g. `ydotool key {key}` or `wtype -M alt 1`.
+    #[serde(default = "default_inject_cmd")]
+    pub inject_cmd: String,
     /// Accounts to index, in the same order as AyuGram's account switcher.
     #[serde(default)]
     pub accounts: Vec<Account>,
@@ -59,6 +65,10 @@ fn default_client() -> String {
 
 fn default_focus_cmd() -> String {
     r#"i3-msg [class="{class}"] focus"#.to_string()
+}
+
+fn default_inject_cmd() -> String {
+    "xdotool key --clearmodifiers {key}".to_string()
 }
 
 /// Built-in D-Bus service name and X11 window class for a known client.

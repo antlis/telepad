@@ -5,6 +5,20 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-03
+
+### Added
+- **Configurable key-injector (`inject_cmd`).** The account-switch keypress is no
+  longer hardwired to `xdotool`. A new `inject_cmd` setting (default
+  `xdotool key --clearmodifiers {key}`, `{key}` substituted) makes cross-account
+  switching work on any WM — e.g. `ydotool key {key}` or `wtype` on Wayland. This
+  completes the focus+inject pipeline: `focus_cmd` (already configurable) picks
+  the window-focuser, `inject_cmd` picks the key-injector.
+
+### Documentation
+- `config.example.toml` now documents `focus_cmd` / `inject_cmd` with ready-made
+  snippets for i3, wmctrl, sway, and hyprland.
+
 ## [0.9.0] - 2026-09-03
 
 ### Added
@@ -134,6 +148,7 @@ your accounts.
   `com.ayugram.desktop`), avoiding the second-process race that kills the window.
 - `login` / `sync` / `menu` commands, with the dialog list cached to JSON.
 
+[0.10.0]: https://github.com/antlis/telepad/releases/tag/v0.10.0
 [0.9.0]: https://github.com/antlis/telepad/releases/tag/v0.9.0
 [0.8.2]: https://github.com/antlis/telepad/releases/tag/v0.8.2
 [0.8.1]: https://github.com/antlis/telepad/releases/tag/v0.8.1
