@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>telepad — rofi quick-switcher for Telegram</title>
+<meta name="description" content="Hit a hotkey from any window, fuzzy-type a few letters, and your Telegram Desktop jumps straight to that chat, group, channel or forum topic — across all your accounts. A rofi quick-switcher for Telegram Desktop and AyuGram.">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+<meta property="og:title" content="telepad — any Telegram chat, two keystrokes away">
+<meta property="og:description" content="Discord's Ctrl-K, reimagined for desktop Telegram. Fuzzy-jump to any chat, group, channel or forum topic across every account — from any window, any WM, X11 or Wayland.">
+<meta property="og:url" content="https://antlis.is-a.dev/telepad/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fafafa;
+    --text: #1a1a1a;
+    --text-secondary: #555;
+    --border: #e5e5e5;
+    --card-bg: #fff;
+    --card-hover: #f5f5f5;
+    --accent: #E35206;
+    --accent-hover: #c44a0a;
+    --code-bg: #f3f3f3;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0a0a0a;
+    --text: #e5e5e5;
+    --text-secondary: #b0b0b0;
+    --border: #2a2a2a;
+    --card-bg: #111;
+    --card-hover: #1d1d1d;
+    --accent: #F77814;
+    --accent-hover: #f9a04f;
+    --code-bg: #0d0d0d;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    scroll-behavior: smooth;
+    overflow-x: clip;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.7;
+    overflow-wrap: break-word;
+    overflow-x: clip;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.2s;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 0.85em;
+    padding: 0.15rem 0.4rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* ─── Nav ─── */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(10, 16, 25, .8);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  nav {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem clamp(1rem, 3vw, 2rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--text);
+    color: var(--bg);
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+  }
+
+  .nav-link:hover, .nav-link.active {
+    color: var(--text);
+  }
+
+  .nav-end {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.35rem;
+    padding: 0.48rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .btn:hover {
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+
+  .btn-primary {
+    color: var(--bg);
+    background: var(--text);
+    border-color: var(--text);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 14px 30px color-mix(in srgb, var(--text) 22%, transparent);
+  }
+
+  .btn-secondary {
+    background: var(--card-bg);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text-secondary);
+    background: var(--card-hover);
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .theme-toggle:hover {
+    color: var(--text);
+    border-color: var(--text-secondary);
+  }
+
+  .theme-toggle .icon-sun { display: none; }
+  .theme-toggle .icon-moon { display: block; }
+
+  [data-theme="light"] .theme-toggle .icon-sun { display: block; }
+  [data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+  .menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 11;
+  }
+
+  .hamburger,
+  .hamburger::before,
+  .hamburger::after {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--text);
+    border-radius: 1px;
+    transition: transform 0.3s, opacity 0.3s;
+  }
+
+  .hamburger { position: relative; }
+
+  .hamburger::before,
+  .hamburger::after {
+    content: '';
+    position: absolute;
+    left: 0;
+  }
+
+  .hamburger::before { top: -6px; }
+  .hamburger::after { top: 6px; }
+
+  .menu-toggle[aria-expanded="true"] .hamburger { background: transparent; }
+  .menu-toggle[aria-expanded="true"] .hamburger::before { top: 0; transform: rotate(45deg); }
+  .menu-toggle[aria-expanded="true"] .hamburger::after { top: 0; transform: rotate(-45deg); }
+
+  .mobile-menu {
+    display: none;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+
+  @media (max-width: 640px) {
+    nav {
+      flex-wrap: wrap;
+      padding: 0.75rem 1rem;
+      justify-content: flex-start;
+      gap: 0;
+    }
+    .nav-links { display: none; }
+    .nav-end {
+      display: flex;
+      margin-left: auto;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .menu-toggle { display: flex; }
+    .mobile-menu {
+      display: block;
+      width: 100%;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.3s ease, opacity 0.3s ease, padding-top 0.3s ease;
+    }
+    .mobile-menu.open {
+      max-height: 400px;
+      opacity: 1;
+      padding-top: 0.75rem;
+    }
+    .mobile-links {
+      display: flex;
+      flex-direction: column;
+      margin: 0 -1rem -1rem;
+      border-top: 1px solid var(--border);
+    }
+    .mobile-link {
+      display: block;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      transition: color 0.2s;
+    }
+    .mobile-link:last-child { border-bottom: none; }
+    .mobile-link:hover, .mobile-link.active { color: var(--text); }
+  }
+
+  /* ─── Main ─── */
+  main {
+    flex: 1;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 3vw, 2rem);
+  }
+
+  /* ─── Hero ─── */
+  .hero {
+    padding: 3rem 0 2.75rem;
+    border-top: none;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.35rem, 1.7rem + 3vw, 4rem);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    max-width: 15ch;
+    margin-bottom: 1rem;
+    text-wrap: balance;
+    color: var(--text);
+  }
+
+  .hero p {
+    max-width: 620px;
+    font-size: clamp(1.05rem, 1rem + 0.25vw, 1.15rem);
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  .hero p strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 1.4rem;
+  }
+
+  /* ─── Diagram ─── */
+  .diagram {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 2.5rem;
+  }
+
+  .node {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 176px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+    transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .node:hover {
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+    transform: translateY(-1px);
+    box-shadow: 0 14px 34px color-mix(in srgb, #000 8%, transparent);
+  }
+
+  .node .em { font-size: 1.5rem; line-height: 1.3; }
+  .node b { font-size: 0.92rem; font-weight: 600; margin-top: 0.35rem; color: var(--text); }
+  .node small { color: var(--text-secondary); font-size: 0.82rem; line-height: 1.45; margin-top: 0.15rem; }
+
+  .link-arrow {
+    align-self: center;
+    color: var(--accent);
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 700px) {
+    .diagram { flex-direction: column; align-items: center; gap: 0.5rem; }
+    .node { width: min(100%, 320px); }
+    .link-arrow { transform: rotate(90deg); margin: 0.25rem 0; }
+  }
+
+  /* ─── Section ─── */
+  section {
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+    scroll-margin-top: 60px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1.15rem;
+    gap: 1rem;
+  }
+
+  .section-header h2 {
+    font-size: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .lead {
+    color: var(--text-secondary);
+    max-width: 620px;
+    margin-bottom: 1.5rem;
+    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.1rem);
+    line-height: 1.7;
+  }
+
+  /* ─── Feature Cards ─── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+  }
+
+  .card {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  @media (hover: hover) {
+    .card:hover {
+      border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+      transform: translateY(-1px);
+      box-shadow: 0 14px 34px color-mix(in srgb, #000 8%, transparent);
+    }
+  }
+
+  .tile {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .card b {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin-bottom: 0.2rem;
+  }
+
+  .card p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0;
+    line-height: 1.6;
+  }
+
+  .card code {
+    color: var(--accent);
+  }
+
+  .shot {
+    margin-top: 1.5rem;
+  }
+
+  .shot img {
+    width: 100%;
+    display: block;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  /* ─── Install ─── */
+  .install-cols {
+    display: grid;
+    grid-template-columns: minmax(260px, 5fr) 7fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .install-cols { grid-template-columns: 1fr; gap: 1.5rem; }
+  }
+
+  .install-cols > * { min-width: 0; }
+
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+  }
+
+  .tabs button {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .tabs button:hover {
+    color: var(--text);
+    border-color: var(--text-secondary);
+  }
+
+  .tabs button.on {
+    color: var(--bg);
+    background: var(--text);
+    border-color: var(--text);
+  }
+
+  .window {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .window-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot:nth-child(1) { background: #ff5f57; }
+  .dot:nth-child(2) { background: #febc2e; }
+  .dot:nth-child(3) { background: #28c840; }
+
+  .window-bar span {
+    margin-left: 0.5rem;
+    color: var(--text-secondary);
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 0.8rem;
+  }
+
+  pre {
+    padding: 1.1rem 1.25rem;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.75;
+    color: var(--text);
+    margin: 0;
+  }
+
+  pre .c { color: var(--text-secondary); }
+  pre .p { color: var(--accent); }
+
+  .tabpane { display: none; }
+  .tabpane.on { display: block; }
+
+  .sub {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin-top: 1rem;
+  }
+
+  .sub a { color: var(--accent); }
+
+  /* ─── Commands ─── */
+  .cmd-groups {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .cmd-groups { grid-template-columns: 1fr; }
+  }
+
+  .group h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.65rem;
+  }
+
+  .group h3::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .cmds {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .row {
+    display: flex;
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+  }
+
+  .row:nth-child(odd) { background: var(--card-bg); }
+  .row:last-child { border-bottom: none; }
+
+  .row:hover { background: color-mix(in srgb, var(--accent) 5%, var(--card-bg)); }
+
+  .row .cmd-name {
+    flex: 0 0 200px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+  }
+
+  .row .cmd-name code {
+    color: var(--accent);
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 0.82rem;
+  }
+
+  .row > span {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+
+  .row > span code {
+    font-size: 0.8em;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 0.3rem;
+  }
+
+  @media (max-width: 560px) {
+    .row { flex-direction: column; gap: 0.1rem; }
+    .row .cmd-name { flex: none; }
+  }
+
+  /* ─── Chips ─── */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .chip {
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+  }
+
+  /* ─── Footer ─── */
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 3rem;
+  }
+
+  .footer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem clamp(1rem, 3vw, 2rem);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .copyright {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-links a {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: var(--text); }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 920px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .hero { padding: 2rem 0; }
+    section { padding: 1.5rem 0; }
+    .grid { grid-template-columns: 1fr; }
+    .hero-actions { flex-direction: column; }
+    .btn { width: 100%; justify-content: center; }
+    footer { margin-top: 1rem; }
+    .footer-inner {
+      flex-direction: column;
+      text-align: center;
+      gap: 1rem;
+    }
+    .footer-links { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="#" class="logo" aria-label="telepad home">
+      <span class="logo-icon">tp</span>
+      telepad
+    </a>
+
+    <div class="nav-links">
+      <a href="#features" class="nav-link active">Features</a>
+      <a href="#install" class="nav-link">Install</a>
+      <a href="#usage" class="nav-link">Usage</a>
+    </div>
+
+    <div class="nav-end">
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a class="btn btn-secondary" href="https://github.com/antlis/telepad" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;">GitHub ↗</a>
+      <button class="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+        <span class="hamburger"></span>
+      </button>
+    </div>
+
+    <div class="mobile-menu" id="mobile-menu" aria-hidden="true" inert>
+      <div class="mobile-links">
+        <a href="#features" class="mobile-link active">Features</a>
+        <a href="#install" class="mobile-link">Install</a>
+        <a href="#usage" class="mobile-link">Usage</a>
+        <a href="https://github.com/antlis/telepad" class="mobile-link">GitHub ↗</a>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Any Telegram chat, two keystrokes away</h1>
+    <p>
+      A <a href="https://github.com/davatorium/rofi" style="color: var(--accent);">rofi</a> quick-switcher for
+      <strong>Telegram Desktop</strong> (and forks like AyuGram). Hit a global hotkey from any window, fuzzy-type
+      a few letters, and it jumps straight to that chat, group, channel, contact or <strong>forum topic</strong> —
+      <strong>across all your accounts</strong>. It's Discord's Ctrl-K, reimagined for the desktop.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#install">Get started</a>
+      <a class="btn btn-secondary" href="https://github.com/antlis/telepad">Source ↗</a>
+    </div>
+
+    <div class="diagram" role="img" aria-label="telepad syncs your chats to a local cache, rofi picks one, and Telegram Desktop jumps to it over D-Bus">
+      <div class="node"><span class="em">🗂️</span><b>Your chats</b><small>grammers sync →<br>local cache, every account</small></div>
+      <div class="link-arrow">──fuzzy──▶</div>
+      <div class="node"><span class="em">⌨️</span><b>rofi picker</b><small>type a few letters,<br>hit Enter</small></div>
+      <div class="link-arrow">──tg://──▶</div>
+      <div class="node"><span class="em">💬</span><b>Telegram Desktop</b><small>jumps to the chat<br>in-place over D-Bus</small></div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="section-header">
+      <h2>Features</h2>
+    </div>
+    <p class="lead">One flat, fuzzy list across every account — with the ranking, folders and topics that make it faster than the client itself.</p>
+
+    <div class="grid">
+      <div class="card"><span class="tile">🔀</span><b>Every account, one list</b><p>Chats, groups, channels and contacts from all your accounts in a single fuzzy list — even contacts you have no open chat with.</p></div>
+      <div class="card"><span class="tile">⚡</span><b>Frecency ranking</b><p>Your most-used chats float to the top automatically — visit count with a 30-day recency half-life.</p></div>
+      <div class="card"><span class="tile">🧵</span><b>Forum topics, flat</b><p>Every forum topic is its own searchable row, so you jump straight to a topic on the first keystroke.</p></div>
+      <div class="card"><span class="tile">📁</span><b>Chat folders</b><p>Each Telegram folder shows as a <code>📁 Folder ▸</code> row that expands into that folder's chats.</p></div>
+      <div class="card"><span class="tile">🗄</span><b>Archive browsing</b><p>Open the archive folder view, or jump straight to a specific archived chat.</p></div>
+      <div class="card"><span class="tile">⭐</span><b>Saved Messages</b><p>A guaranteed Saved Messages row per account, ranked like any other jump target.</p></div>
+      <div class="card"><span class="tile">🔎</span><b>@handle search</b><p>Match a peer by display name <em>or</em> its public <code>@username</code> — whichever you remember.</p></div>
+      <div class="card"><span class="tile">🖼</span><b>Optional avatars</b><p><code>sync --avatars</code> shows profile photos as row icons. Opt-in — plain <code>sync</code> stays a clean text list.</p></div>
+      <div class="card"><span class="tile">🧩</span><b>Any client</b><p>Vanilla Telegram Desktop by default, or AyuGram / another TDesktop fork via one <code>client</code> line.</p></div>
+      <div class="card"><span class="tile">🪟</span><b>Any window manager</b><p>Configurable focuser + key-injector — i3, sway, hyprland; X11 or Wayland (<code>xdotool</code> / <code>ydotool</code>).</p></div>
+      <div class="card"><span class="tile">🔒</span><b>Local &amp; private</b><p>Your session and chat list live on disk. No server, no cloud, no telemetry — just MTProto and D-Bus.</p></div>
+      <div class="card"><span class="tile">🚀</span><b>Global hotkey</b><p>Bind <code>telepad</code> to a key in your WM and trigger it from your editor, terminal, browser — anything.</p></div>
+    </div>
+
+    <div class="shot">
+      <img src="demo.svg" alt="A rofi window titled Jump, with the query 'dur' typed and a fuzzy list of chats across two accounts — the top result selected">
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="install-cols">
+      <div>
+        <div class="section-header" style="margin-bottom: 0;">
+          <h2>Install</h2>
+        </div>
+        <p class="lead">A single static Rust binary. You'll need <a href="https://github.com/davatorium/rofi" style="color: var(--accent);">rofi</a> and an app <code>api_id</code> / <code>api_hash</code> from <a href="https://my.telegram.org" style="color: var(--accent);">my.telegram.org</a>.</p>
+        <div class="tabs" role="tablist">
+          <button class="on" data-t="src" role="tab">From source</button>
+          <button data-t="cargo" role="tab">Cargo</button>
+          <button data-t="nix" role="tab">Nix</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="tabpane on" id="src">
+          <div class="window">
+            <div class="window-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>build &amp; set up</span></div>
+<pre><code>git clone https://github.com/antlis/telepad
+cd telepad <span class="p">&amp;&amp;</span> cargo install --path .
+
+<span class="c"># ~/.config/telepad/config.toml → api creds + accounts</span>
+telepad login personal   <span class="c"># interactive, one per account</span>
+telepad sync             <span class="c"># cache your chats</span>
+<span class="c"># then bind `telepad` to a hotkey in your WM</span></code></pre>
+          </div>
+        </div>
+        <div class="tabpane" id="cargo">
+          <div class="window">
+            <div class="window-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>cargo</span></div>
+<pre><code>cargo install --git https://github.com/antlis/telepad
+<span class="c"># (crates.io release coming: cargo install telepad)</span></code></pre>
+          </div>
+        </div>
+        <div class="tabpane" id="nix">
+          <div class="window">
+            <div class="window-bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>rustPlatform.buildRustPackage</span></div>
+<pre><code>telepad = pkgs.rustPlatform.buildRustPackage {
+  pname = <span class="p">"telepad"</span>;
+  version = <span class="p">"0.10.0"</span>;
+  src = pkgs.fetchFromGitHub {
+    owner = <span class="p">"antlis"</span>; repo = <span class="p">"telepad"</span>;
+    rev = <span class="p">"v0.10.0"</span>; hash = <span class="p">"…"</span>;
+  };
+  cargoHash = <span class="p">"…"</span>;
+};</code></pre>
+          </div>
+        </div>
+        <p class="sub">Cross-account switching drives the client's own account-switch shortcut with a real keypress (the <code>tg://…&amp;acc=</code> deep-link crashes AyuGram). That needs a focuser + key-injector — defaults <code>i3-msg</code> + <code>xdotool</code>, overridable for any WM. See <a href="https://github.com/antlis/telepad#configuration">Configuration</a> in the README.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="usage">
+    <div class="section-header" style="justify-content: center; text-align: center;">
+      <h2>Usage</h2>
+    </div>
+    <p class="lead" style="text-align: center; margin-inline: auto;">Three commands and a handful of config keys — bind <code>telepad</code> to a hotkey and forget the rest.</p>
+
+    <div class="cmd-groups">
+      <div class="group">
+        <h3>Commands</h3>
+        <div class="cmds">
+          <div class="row"><div class="cmd-name"><code>telepad menu</code></div><span>open the switcher (bind this to a hotkey) — also the default with no args</span></div>
+          <div class="row"><div class="cmd-name"><code>telepad login &lt;acct&gt;</code></div><span>interactive MTProto login, one session per account</span></div>
+          <div class="row"><div class="cmd-name"><code>telepad sync [acct|all]</code></div><span>refresh the cached chat list for one account or all</span></div>
+          <div class="row"><div class="cmd-name"><code>telepad sync --avatars</code></div><span>also download profile photos to show as row icons</span></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Config keys · config.toml</h3>
+        <div class="cmds">
+          <div class="row"><div class="cmd-name"><code>client</code></div><span><code>telegram</code> (default) or <code>ayugram</code> — sets the D-Bus name &amp; window class</span></div>
+          <div class="row"><div class="cmd-name"><code>focus_cmd</code></div><span>focus the client window (<code>{class}</code>) — i3 / sway / hyprctl</span></div>
+          <div class="row"><div class="cmd-name"><code>inject_cmd</code></div><span>press the switch key (<code>{key}</code>) — xdotool / ydotool</span></div>
+          <div class="row"><div class="cmd-name"><code>dbus_service</code></div><span>override the client's D-Bus name for other TDesktop forks</span></div>
+          <div class="row"><div class="cmd-name"><code>accounts[].switch_key</code></div><span>key that switches to this account, e.g. <code>alt+1</code> — empty = same-account only</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <p class="copyright">⚡ telepad · MIT / Apache-2.0 · built by <a href="https://github.com/antlis" style="color: var(--accent);">antlis</a></p>
+    <div class="footer-links">
+      <a href="https://github.com/antlis/telepad">Source</a>
+      <a href="https://github.com/antlis/telepad/releases">Releases</a>
+      <a href="https://github.com/antlis/telepad/blob/master/CHANGELOG.md">Changelog</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Theme toggle
+  const toggle = document.getElementById('theme-toggle');
+  const html = document.documentElement;
+
+  toggle.addEventListener('click', () => {
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+  });
+
+  // Mobile menu
+  const menuToggle = document.querySelector('.menu-toggle');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  menuToggle.addEventListener('click', () => {
+    const expanded = menuToggle.getAttribute('aria-expanded') === 'true';
+    menuToggle.setAttribute('aria-expanded', String(!expanded));
+    mobileMenu.setAttribute('aria-hidden', String(expanded));
+    mobileMenu.toggleAttribute('inert', expanded);
+    mobileMenu.classList.toggle('open', !expanded);
+  });
+
+  mobileMenu.querySelectorAll('.mobile-link').forEach(link => {
+    link.addEventListener('click', () => {
+      menuToggle.setAttribute('aria-expanded', 'false');
+      mobileMenu.setAttribute('aria-hidden', 'true');
+      mobileMenu.toggleAttribute('inert', true);
+      mobileMenu.classList.remove('open');
+    });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
+      menuToggle.setAttribute('aria-expanded', 'false');
+      mobileMenu.setAttribute('aria-hidden', 'true');
+      mobileMenu.toggleAttribute('inert', true);
+      mobileMenu.classList.remove('open');
+      menuToggle.focus();
+    }
+  });
+
+  // Smooth scroll for nav links
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  // Install tabs
+  document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById(b.dataset.t).classList.add('on');
+  }));
+</script>
+</body>
+</html>

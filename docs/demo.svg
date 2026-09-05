@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 392" font-family="'SF Mono','Fira Code',Menlo,monospace" role="img" aria-label="A rofi window titled Jump with the query 'nix' typed, showing matching chats across two accounts">
+  <!-- window -->
+  <rect x="1" y="1" width="818" height="390" rx="12" fill="#0d0d0d" stroke="#2a2a2a"/>
+
+  <!-- title bar -->
+  <circle cx="28" cy="30" r="6.5" fill="#ff5f57"/>
+  <circle cx="50" cy="30" r="6.5" fill="#febc2e"/>
+  <circle cx="72" cy="30" r="6.5" fill="#28c840"/>
+  <text x="100" y="35" fill="#b0b0b0" font-size="14">telepad ▸ Jump</text>
+  <line x1="0" y1="58" x2="820" y2="58" stroke="#2a2a2a"/>
+
+  <!-- search input -->
+  <rect x="20" y="74" width="780" height="44" rx="8" fill="#111" stroke="#F77814" stroke-opacity="0.55"/>
+  <text x="38" y="102" fill="#F77814" font-size="15" font-weight="bold">Jump</text>
+  <text x="104" y="102" fill="#e5e5e5" font-size="15">nix</text>
+  <rect x="132" y="86" width="2" height="20" fill="#F77814"/>
+  <text x="770" y="102" fill="#6a6a6a" font-size="13" text-anchor="end">5/128</text>
+
+  <!-- selected row -->
+  <rect x="12" y="132" width="796" height="44" rx="6" fill="#F77814" fill-opacity="0.12"/>
+  <rect x="12" y="132" width="4" height="44" fill="#F77814"/>
+  <text y="160" font-size="15">
+    <tspan x="34" fill="#F77814">[personal]</tspan>
+    <tspan x="168" fill="#ffffff">NixOS</tspan>
+    <tspan x="470" fill="#b0b0b0">@nixos_ru</tspan>
+    <tspan x="690" fill="#b0b0b0">· channel</tspan>
+  </text>
+
+  <!-- rows -->
+  <text y="206" font-size="15">
+    <tspan x="34" fill="#F77814">[personal]</tspan>
+    <tspan x="168" fill="#e5e5e5">NixOS ▸ Announcements</tspan>
+    <tspan x="690" fill="#b0b0b0">· topic</tspan>
+  </text>
+  <text y="252" font-size="15">
+    <tspan x="34" fill="#F77814">[work]</tspan>
+    <tspan x="168" fill="#e5e5e5">nix-community</tspan>
+    <tspan x="470" fill="#b0b0b0">@nix_community</tspan>
+    <tspan x="690" fill="#b0b0b0">· group</tspan>
+  </text>
+  <text y="298" font-size="15">
+    <tspan x="34" fill="#F77814">[personal]</tspan>
+    <tspan x="168" fill="#e5e5e5">Nixpkgs PRs</tspan>
+    <tspan x="470" fill="#b0b0b0">@nixpkgs</tspan>
+    <tspan x="690" fill="#b0b0b0">· channel</tspan>
+  </text>
+  <text y="344" font-size="15">
+    <tspan x="34" fill="#F77814">[work]</tspan>
+    <tspan x="168" fill="#e5e5e5">NixCon</tspan>
+    <tspan x="470" fill="#b0b0b0">@nixcon</tspan>
+    <tspan x="690" fill="#b0b0b0">· channel</tspan>
+  </text>
+</svg>
