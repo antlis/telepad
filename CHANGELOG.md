@@ -5,6 +5,13 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-09-14
+
+### Documentation
+- Published to [crates.io](https://crates.io/crates/telepad) (`cargo install telepad`).
+  No functional changes from 0.10.0 — this release folds in the crates.io
+  packaging metadata (repository/homepage/readme) and the project landing page.
+
 ## [0.10.0] - 2026-09-03
 
 ### Added
