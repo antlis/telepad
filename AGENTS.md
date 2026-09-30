@@ -74,7 +74,10 @@ source), so don't "fix" them back to the old shapes:
   focuses the window and injects `accounts[].switch_key` via `xdotool`. Never
   reintroduce `acc=` into built URLs.
 - **URLs carry no account** (`link::build` → one URL): public peers use
-  `tg://resolve?domain=`, everything else uses `tg://chat?id=<PeerId>`. The PeerId is
+  `tg://resolve?domain=`, private channels `tg://privatepost?channel=`, users with a
+  visible phone `tg://resolve?phone=`, everything else `tg://chat?id=<PeerId>`.
+  `chat?id=` never works over D-Bus: GLib rewrites it to `tg://chat/?id=`, which
+  AyuGram's `^chat\?` handler doesn't match. The PeerId is
   tdesktop's internal packed id (`bare | (shift<<48)`; shift 0/1/2 = user/chat/channel),
   computed from the Bot-API id in `tdesktop_peer_id`.
 - **`acc` is 1-based** and mirrors AyuGram's account order (display/ordering only).

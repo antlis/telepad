@@ -114,6 +114,7 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account, avatars: bool) -> Re
     let me = client.get_me().await.context("fetching self user")?;
     let me_id = me.id().to_string().parse().unwrap_or(0);
     let me_username = me.username().map(str::to_string);
+    let me_phone = me.phone().map(str::to_string);
 
     let mut entries = Vec::new();
     let mut dialogs = client.iter_dialogs();
@@ -125,6 +126,10 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account, avatars: bool) -> Re
             Peer::Channel(_) => "channel",
         };
         let name = peer.name().unwrap_or("(no name)").to_string();
+        let phone = match peer {
+            Peer::User(user) => user.phone().map(str::to_string),
+            _ => None,
+        };
 
         // If this is a forum supergroup, pull its topic list too.
         let topics = match forum_input_peer(peer) {
@@ -140,6 +145,7 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account, avatars: bool) -> Re
         entries.push(Entry {
             name,
             username: peer.username().map(str::to_string),
+            phone,
             id,
             kind: kind.to_string(),
             topics,
@@ -167,6 +173,7 @@ pub async fn fetch_dialogs(cfg: &Config, account: &Account, avatars: bool) -> Re
         label: account.label.clone(),
         me_id,
         me_username,
+        me_phone,
         entries,
         archived,
         folders,
@@ -371,6 +378,7 @@ fn build_peer_entry(
                     name
                 },
                 username: u.username.clone(),
+                phone: u.phone.clone(),
                 id: u.id,
                 kind: "user".into(),
                 topics: Vec::new(),
@@ -384,6 +392,7 @@ fn build_peer_entry(
             Some(Entry {
                 name: c.title.clone(),
                 username: None,
+                phone: None,
                 id: -c.id,
                 kind: "group".into(),
                 topics: Vec::new(),
@@ -397,6 +406,7 @@ fn build_peer_entry(
             Some(Entry {
                 name: c.title.clone(),
                 username: c.username.clone(),
+                phone: None,
                 id: -(1_000_000_000_000 + c.id),
                 kind: if c.broadcast { "channel" } else { "group" }.into(),
                 topics: Vec::new(),
@@ -476,6 +486,7 @@ async fn fetch_contacts(client: &Client) -> Vec<Entry> {
             Some(Entry {
                 name,
                 username: user.username,
+                phone: user.phone,
                 id: user.id,
                 kind: "user".to_string(),
                 topics: Vec::new(),

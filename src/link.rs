@@ -22,10 +22,15 @@ const CHANNEL_SHIFT: u64 = 2 << 48;
 ///   API even when it isn't loaded in the client. The `chat?id=` handler's
 ///   fallback is broken for unloaded channels (it re-prepends `-100` to the
 ///   already-packed PeerId), so jumps to less-active private channels fail.
-/// - Username-less user / legacy basic group → `chat?id=<packed PeerId>`.
+/// - Username-less user with a visible phone → `resolve?phone=`.
+/// - Anything else → `chat?id=<packed PeerId>`. This is effectively dead over
+///   D-Bus: GLib's GFile normalizes `tg://chat?id=N` to `tg://chat/?id=N`, which
+///   AyuGram's `^chat\?` handler doesn't match, so the link is silently dropped.
 pub fn build(entry: &Entry) -> String {
     if let Some(username) = &entry.username {
         format!("tg://resolve?domain={username}")
+    } else if let Some(phone) = &entry.phone {
+        format!("tg://resolve?phone={phone}")
     } else if entry.id <= -1_000_000_000_000 {
         // Channel/supergroup: bot id is -(1e12 + bare); recover the bare id.
         let raw = -entry.id - 1_000_000_000_000;

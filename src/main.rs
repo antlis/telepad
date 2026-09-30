@@ -195,6 +195,7 @@ async fn menu(cfg: &Config) -> Result<()> {
             let entry = cache::Entry {
                 name: "Saved Messages".to_string(),
                 username: account_cache.me_username.clone(),
+                phone: account_cache.me_phone.clone(),
                 id: account_cache.me_id,
                 kind: "user".to_string(),
                 topics: Vec::new(),

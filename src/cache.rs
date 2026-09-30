@@ -12,6 +12,10 @@ pub struct Entry {
     pub name: String,
     /// Public @username without the "@", if any. Preferred for deep links.
     pub username: Option<String>,
+    /// Phone number (digits, no "+") of a username-less user, if visible to us.
+    /// Used for `tg://resolve?phone=` links.
+    #[serde(default)]
+    pub phone: Option<String>,
     /// Bot-API style id (positive for users). Used for username-less private chats.
     pub id: i64,
     /// "user" | "group" | "channel".
@@ -48,6 +52,9 @@ pub struct AccountCache {
     /// This account's own @username, if any (for the Saved Messages deep link).
     #[serde(default)]
     pub me_username: Option<String>,
+    /// This account's own phone number (Saved Messages link when there's no @username).
+    #[serde(default)]
+    pub me_phone: Option<String>,
     pub entries: Vec<Entry>,
     /// Archived chats (folder 1), surfaced behind a separate menu item.
     #[serde(default)]
