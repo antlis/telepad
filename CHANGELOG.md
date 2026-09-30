@@ -5,6 +5,14 @@ All notable changes to telepad are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Basic (legacy) groups and users with no @username and no visible phone now
+  open.** Their `tg://chat?id=` links are delivered over AyuGram's single-instance
+  socket, which passes the URL through verbatim, instead of D-Bus (where GLib
+  mangles it). Falls back to D-Bus if the socket isn't found.
+
 ## [0.10.2] - 2026-09-30
 
 ### Fixed
@@ -13,10 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tg://chat/?id=` on the D-Bus path, which AyuGram's handler doesn't match.
   `sync` now caches phone numbers (your own, and other users' where visible) and
   such rows open via `tg://resolve?phone=`. Re-run `telepad sync` to pick it up.
-
-### Known issues
-- Basic (legacy) groups and users with no @username and no visible phone still
-  can't be opened — AyuGram has no deep link for them that survives D-Bus.
 
 ## [0.10.1] - 2026-09-14
 

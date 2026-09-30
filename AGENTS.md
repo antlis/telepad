@@ -77,7 +77,9 @@ source), so don't "fix" them back to the old shapes:
   `tg://resolve?domain=`, private channels `tg://privatepost?channel=`, users with a
   visible phone `tg://resolve?phone=`, everything else `tg://chat?id=<PeerId>`.
   `chat?id=` never works over D-Bus: GLib rewrites it to `tg://chat/?id=`, which
-  AyuGram's `^chat\?` handler doesn't match. The PeerId is
+  AyuGram's `^chat\?` handler doesn't match. So `link::open` sends `chat?id=` URLs
+  over AyuGram's single-instance socket instead (`OPEN:<url>;`, abstract socket
+  found by the `-AyuGramDesktop` suffix in `/proc/net/unix`), falling back to D-Bus. The PeerId is
   tdesktop's internal packed id (`bare | (shift<<48)`; shift 0/1/2 = user/chat/channel),
   computed from the Bot-API id in `tdesktop_peer_id`.
 - **`acc` is 1-based** and mirrors AyuGram's account order (display/ordering only).

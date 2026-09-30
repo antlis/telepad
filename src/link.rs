@@ -1,6 +1,9 @@
 //! Build `tg://` deep links and deliver them to the running AyuGram over D-Bus.
 
 use anyhow::{anyhow, Result};
+use std::io::{Read, Write};
+use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::{SocketAddr, UnixStream};
 use std::process::Command;
 
 use crate::cache::Entry;
@@ -23,9 +26,9 @@ const CHANNEL_SHIFT: u64 = 2 << 48;
 ///   fallback is broken for unloaded channels (it re-prepends `-100` to the
 ///   already-packed PeerId), so jumps to less-active private channels fail.
 /// - Username-less user with a visible phone → `resolve?phone=`.
-/// - Anything else → `chat?id=<packed PeerId>`. This is effectively dead over
-///   D-Bus: GLib's GFile normalizes `tg://chat?id=N` to `tg://chat/?id=N`, which
-///   AyuGram's `^chat\?` handler doesn't match, so the link is silently dropped.
+/// - Anything else → `chat?id=<packed PeerId>`. Dead over D-Bus (GLib's GFile
+///   rewrites it to `tg://chat/?id=N`, which AyuGram's `^chat\?` handler doesn't
+///   match), so [`open`] delivers these over AyuGram's single-instance socket.
 pub fn build(entry: &Entry) -> String {
     if let Some(username) = &entry.username {
         format!("tg://resolve?domain={username}")
@@ -146,6 +149,11 @@ fn tdesktop_peer_id(bot_id: i64) -> u64 {
 /// When the client isn't running, the same call D-Bus-activates a fresh instance
 /// and opens the chat. Both are safe.
 pub fn open(service: &str, object_path: &str, url: &str) -> Result<()> {
+    // `chat?id=` is mangled by GLib on the D-Bus path (see `build`); the client's
+    // own single-instance socket delivers it verbatim.
+    if url.starts_with("tg://chat?id=") && open_via_socket(url).is_ok() {
+        return Ok(());
+    }
     let status = Command::new("gdbus")
         .args([
             "call",
@@ -162,6 +170,28 @@ pub fn open(service: &str, object_path: &str, url: &str) -> Result<()> {
         .status()?;
     if !status.success() {
         return Err(anyhow!("gdbus call failed for {url}"));
+    }
+    Ok(())
+}
+
+/// Hand `url` to the running AyuGram over its single-instance socket, an abstract
+/// UNIX socket named `<md5(workdir)>-AyuGramDesktop` speaking `OPEN:<url>;` →
+/// `RES:<pid>_<win>;`. It's the same handoff a second launch would do, minus the
+/// second process, and it skips GLib's URI rewriting. The hash prefix depends on
+/// the working directory, so the socket is found by suffix in `/proc/net/unix`.
+fn open_via_socket(url: &str) -> Result<()> {
+    let table = std::fs::read_to_string("/proc/net/unix")?;
+    let name = table
+        .split_whitespace()
+        .find_map(|f| f.strip_prefix('@').filter(|n| n.ends_with("-AyuGramDesktop")))
+        .ok_or_else(|| anyhow!("AyuGram single-instance socket not found"))?;
+    let mut stream = UnixStream::connect_addr(&SocketAddr::from_abstract_name(name)?)?;
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(3)))?;
+    stream.write_all(format!("OPEN:{url};").as_bytes())?;
+    let mut reply = [0u8; 64];
+    let n = stream.read(&mut reply)?;
+    if !reply[..n].starts_with(b"RES:") {
+        return Err(anyhow!("unexpected socket reply for {url}"));
     }
     Ok(())
 }
