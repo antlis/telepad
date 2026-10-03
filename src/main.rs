@@ -19,6 +19,13 @@ use config::Config;
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // `--help` must work without a config on disk, so short-circuit before loading.
+    if matches!(args.first().map(String::as_str), Some("-h" | "--help" | "help")) {
+        print!("{}", help());
+        return Ok(());
+    }
+
     let cfg = Config::load()?;
 
     match args.first().map(String::as_str) {
@@ -43,11 +50,43 @@ async fn main() -> Result<()> {
         Some("menu") | None => menu(&cfg).await?,
         Some(other) => {
             return Err(anyhow!(
-                "unknown command '{other}'. Commands: login <acct>, sync [acct|all], menu"
+                "unknown command '{other}'\n\nRun `telepad --help` for the list of commands"
             ));
         }
     }
     Ok(())
+}
+
+/// The `--help` text: every command, what it does, and where things live.
+fn help() -> String {
+    format!(
+        "\
+telepad — rofi quick-switcher for AyuGram / Telegram Desktop
+
+Usage:
+  telepad [command] [options]
+
+Commands:
+  menu                 Open the rofi chat switcher (default with no command)
+  sync [acct|all]      Refresh the chat cache: dialogs, contacts, forum topics.
+                       `acct` selects one account, `all` (the default) does
+                       every configured account
+  sync --avatars       Same, plus download profile photos shown as row icons
+  login <acct>         (Re)authenticate an account, interactively
+  help                 Show this help
+
+Options:
+  -h, --help           Show this help
+
+<acct> accepts an account's session name, its label, or its 1-based number,
+e.g. `telepad sync personal`, `telepad sync 2`, `telepad login work`.
+
+Config: {}
+Data:    {}
+",
+        config::config_path().display(),
+        config::data_dir().display()
+    )
 }
 
 /// Refresh the dialog cache for one account or all of them.
