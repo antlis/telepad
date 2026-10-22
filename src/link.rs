@@ -154,22 +154,23 @@ pub fn open(service: &str, object_path: &str, url: &str) -> Result<()> {
     if url.starts_with("tg://chat?id=") && open_via_socket(url).is_ok() {
         return Ok(());
     }
-    let status = Command::new("gdbus")
+    // busctl ships with systemd; gdbus (glib) isn't installed on every system.
+    let status = Command::new("busctl")
         .args([
+            "--user",
             "call",
-            "--session",
-            "--dest",
             service,
-            "--object-path",
             object_path,
-            "--method",
-            "org.freedesktop.Application.Open",
-            &format!("['{url}']"),
-            "{}",
+            "org.freedesktop.Application",
+            "Open",
+            "asa{sv}",
+            "1",
+            url,
+            "0",
         ])
         .status()?;
     if !status.success() {
-        return Err(anyhow!("gdbus call failed for {url}"));
+        return Err(anyhow!("busctl call failed for {url}"));
     }
     Ok(())
 }

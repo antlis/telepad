@@ -98,7 +98,7 @@ same-account only (rock-solid, no focuser/injector needed).
 
 - **Rust** (to build)
 - **rofi** — the menu
-- **gdbus** (GLib) — delivers the URL to the running client
+- **busctl** (systemd) — delivers the URL to the running client
 - for cross-account switching only: a **window-focuser** and a **key-injector** —
   defaults `i3-msg` + `xdotool` (X11); override `focus_cmd` / `inject_cmd` for
   other WMs (e.g. `swaymsg`/`hyprctl` + `ydotool` on Wayland)
